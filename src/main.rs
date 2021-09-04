@@ -30,7 +30,6 @@ fn convert_vec_to_vec_of_tuples(untupled_vec: Vec<Instant>) -> Vec<(Instant, Ins
             tupled_vec.push((*instant, untupled_vec[idx + 1]));
         }
     }
-    println!("tupled_vec {:?}", tupled_vec);
     tupled_vec
 }
 
