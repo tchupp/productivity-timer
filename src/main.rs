@@ -1,7 +1,31 @@
+extern crate daemonize;
+
 use std::io;
 use std::time::{Duration, Instant};
+use std::fs::File;
+use daemonize::Daemonize;
 
 fn main() {
+    let tmp_daemon_out = File::create("/tmp/daemon.out").unwrap();
+    let tmp_daemon_err = File::create("/tmp/daemon.err").unwrap();
+
+    let daemonize = Daemonize::new()
+        .pid_file("/tmp/test.pid") // Every method except `new` and `start`
+        .working_directory("/tmp") // for default behaviour.
+        .stdout(tmp_daemon_out)    // Redirect to `/tmp/daemon.out`.
+        .stderr(tmp_daemon_err)    // Redirect to `/tmp/daemon.err`.
+        .exit_action(|| println!("Executed before master process exits"));
+
+    match daemonize.start() {
+        Ok(_) => {
+            println!("Success, daemonized");
+            listen_for_durations()
+        }
+        Err(e) => eprintln!("Error, {}", e),
+    }
+}
+
+fn listen_for_durations () {
     let mut durations: Vec<Instant> = Vec::new();
     loop {
 
@@ -17,6 +41,10 @@ fn main() {
             _ => println!("no default behavior yet")
         }
 
+        // TODO: signals, not stdio
+        // Adding break for now to demo the behavior, but `k` and `p` will
+        // need to be rewritten
+        break
     }
 }
 
