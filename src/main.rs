@@ -1,58 +1,46 @@
 extern crate daemonize;
 
-use std::io;
-use std::fs::{create_dir, File, OpenOptions};
+use std::fs::{create_dir, read_to_string, write, File, OpenOptions};
 use std::time::{Duration, Instant};
+use std::thread::sleep;
 use std::path::Path;
+use std::process::exit;
 use daemonize::Daemonize;
 
-const IN_FILE: &str = "/var/tmp/productivity-timer/out";
-const OUT_FILE: &str = "/var/tmp/productivity-timer/in";
+const WORKING_DIRECTORY: &str = "/var/tmp/productivity-timer";
+const IN_FILE: &str = "/var/tmp/productivity-timer/in";
+const OUT_FILE: &str = "/var/tmp/productivity-timer/out";
 const ERR_FILE: &str = "/var/tmp/productivity-timer/err";
 const PID_FILE: &str = "/var/tmp/productivity-timer/timer.pid";
-const WORKING_DIRECTORY: &str = "/var/tmp/productivity-timer";
+
 
 fn main() {
     daemonize();
 }
 
 
-fn create_tmp_productivity_timer_dir () {
-    if !Path::new("/var/tmp/productivity-timer").exists() {
-        match create_dir(WORKING_DIRECTORY) {
-            Ok(_) => (),
-            Err(e) => eprintln!("Error, {}", e),
-        }
-    }
-}
-
-fn create_tmp_files () -> (File, File){
+fn create_tmp_files () -> (File, File) {
     create_tmp_productivity_timer_dir();
-    let tmp_daemon_out = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(OUT_FILE)
-        .unwrap();
+    let tmp_file_out = create_tmp_file(OUT_FILE, false /*append*/);
+    let tmp_file_err = create_tmp_file(ERR_FILE, false /*append*/);
 
-    let tmp_daemon_err = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(ERR_FILE)
-        .unwrap();
+    // We only need this created, not passed back. We won't use File for
+    // the in-file below, but rather the &str constant IN_FILE
+    create_tmp_file(IN_FILE, false /*append*/);
+    // TODO: decide if I should clean outfile
+    clean_files_on_startup();
 
-    (tmp_daemon_out, tmp_daemon_err)
+    (tmp_file_out, tmp_file_err)
 }
 
 fn daemonize () {
-    let (tmp_daemon_out, tmp_daemon_err) = create_tmp_files();
+    let (tmp_file_out, tmp_file_err) = create_tmp_files();
 
     let daemonize = Daemonize::new()
         .pid_file(PID_FILE)
         .working_directory(WORKING_DIRECTORY)
-        .stdout(tmp_daemon_out)
-        .stderr(tmp_daemon_err)
+        .stdout(tmp_file_out)
+        .stderr(tmp_file_err)
         .exit_action(|| println!("TODO: exiting"));
 
     match daemonize.start() {
@@ -66,23 +54,35 @@ fn daemonize () {
 
 fn listen_for_durations () {
     let mut durations: Vec<Instant> = Vec::new();
+
+    let half_second = Duration::from_millis(500);
+
     loop {
+        sleep(half_second);
 
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).expect("Something went wrong with reading stdin");
-
+        let input = read_to_string(IN_FILE).expect("Reading from tmp in failed");
         match input.trim() {
-            "k" =>  durations.push(Instant::now()),
+            "e" => {
+                println!("println exiting");
+                exit(0)
+            }
+            "k" =>  {
+                println!("println k");
+                durations.push(Instant::now())
+            }
             "p" =>  {
-                let gained_time = get_duration_from_vec_of_tupled_instants(convert_vec_to_vec_of_tuples(durations.clone()));
+                println!("println p");
+                let gained_time = get_duration_from_vec_of_tupled_instants(
+                    convert_vec_to_vec_of_tuples(
+                        durations.clone()
+                    )
+                );
                 println!("gained time: {:?}", gained_time);
             },
-            _ => println!("no default behavior yet")
+            _ => ()
         }
 
-        // TODO: signals, not stdio
-        // Adding break for now to demo the behavior, but `k` and `p` will
-        // need to be rewritten
+        write(IN_FILE, "").expect("Error writing to tmp in");
     }
 }
 
@@ -113,4 +113,36 @@ fn get_duration_from_vec_of_tupled_instants(tupled_vec: Vec<(Instant, Instant)>)
     durations_from_tuples
         .iter()
         .sum()
+}
+
+fn create_tmp_productivity_timer_dir () {
+    if !Path::new("/var/tmp/productivity-timer").exists() {
+        match create_dir(WORKING_DIRECTORY) {
+            Ok(_) => (),
+            Err(e) => eprintln!("Error, {}", e),
+        }
+    }
+}
+
+fn create_tmp_file (file_name: &str, append: bool) -> File {
+    if append {
+        return OpenOptions::new()
+            .read(true)
+            .append(true)
+            .create(true)
+            .open(file_name)
+            .unwrap();
+
+    }
+
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(file_name)
+        .unwrap()
+}
+
+fn clean_files_on_startup () {
+    write(IN_FILE, "").expect("Error writing to tmp in");
 }
