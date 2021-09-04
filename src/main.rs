@@ -1,20 +1,59 @@
 extern crate daemonize;
 
 use std::io;
+use std::fs::{create_dir, File, OpenOptions};
 use std::time::{Duration, Instant};
-use std::fs::File;
+use std::path::Path;
 use daemonize::Daemonize;
 
+const IN_FILE: &str = "/var/tmp/productivity-timer/out";
+const OUT_FILE: &str = "/var/tmp/productivity-timer/in";
+const ERR_FILE: &str = "/var/tmp/productivity-timer/err";
+const PID_FILE: &str = "/var/tmp/productivity-timer/timer.pid";
+const WORKING_DIRECTORY: &str = "/var/tmp/productivity-timer";
+
 fn main() {
-    let tmp_daemon_out = File::create("/tmp/daemon.out").unwrap();
-    let tmp_daemon_err = File::create("/tmp/daemon.err").unwrap();
+    daemonize();
+}
+
+
+fn create_tmp_productivity_timer_dir () {
+    if !Path::new("/var/tmp/productivity-timer").exists() {
+        match create_dir(WORKING_DIRECTORY) {
+            Ok(_) => (),
+            Err(e) => eprintln!("Error, {}", e),
+        }
+    }
+}
+
+fn create_tmp_files () -> (File, File){
+    create_tmp_productivity_timer_dir();
+    let tmp_daemon_out = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(OUT_FILE)
+        .unwrap();
+
+    let tmp_daemon_err = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(ERR_FILE)
+        .unwrap();
+
+    (tmp_daemon_out, tmp_daemon_err)
+}
+
+fn daemonize () {
+    let (tmp_daemon_out, tmp_daemon_err) = create_tmp_files();
 
     let daemonize = Daemonize::new()
-        .pid_file("/tmp/test.pid") // Every method except `new` and `start`
-        .working_directory("/tmp") // for default behaviour.
-        .stdout(tmp_daemon_out)    // Redirect to `/tmp/daemon.out`.
-        .stderr(tmp_daemon_err)    // Redirect to `/tmp/daemon.err`.
-        .exit_action(|| println!("Executed before master process exits"));
+        .pid_file(PID_FILE)
+        .working_directory(WORKING_DIRECTORY)
+        .stdout(tmp_daemon_out)
+        .stderr(tmp_daemon_err)
+        .exit_action(|| println!("TODO: exiting"));
 
     match daemonize.start() {
         Ok(_) => {
@@ -44,7 +83,6 @@ fn listen_for_durations () {
         // TODO: signals, not stdio
         // Adding break for now to demo the behavior, but `k` and `p` will
         // need to be rewritten
-        break
     }
 }
 
