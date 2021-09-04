@@ -21,7 +21,9 @@ fn main() {
 }
 
 fn convert_vec_to_vec_of_tuples(untupled_vec: Vec<Instant>) -> Vec<(Instant, Instant)> {
-    // TODO: test for uneven number (meaning timer still going)
+    if untupled_vec.len() % 2 != 0 {
+        panic!("TODO: attempted to print timer before stopping it");
+    }
     let mut tupled_vec = Vec::new();
     for (idx, instant) in untupled_vec.iter().enumerate() {
         if idx % 2 == 0 {
