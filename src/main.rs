@@ -1,11 +1,11 @@
-extern crate daemonize;
+use clap::{App, SubCommand};
+use daemonize::Daemonize;
 
 use std::fs::{create_dir, read_to_string, write, File, OpenOptions};
 use std::time::{Duration, Instant};
 use std::thread::sleep;
 use std::path::Path;
 use std::process::exit;
-use daemonize::Daemonize;
 
 const WORKING_DIRECTORY: &str = "/var/tmp/productivity-timer";
 const IN_FILE: &str = "/var/tmp/productivity-timer/in";
@@ -16,7 +16,30 @@ const TIME_GAINED_FILE: &str = "/var/tmp/productivity-timer/time-gained";
 
 
 fn main() {
-    daemonize();
+    let matches = App::new("")
+        .subcommand(SubCommand::with_name("trigger"))
+        .subcommand(SubCommand::with_name("print"))
+        .subcommand(SubCommand::with_name("daemonize"))
+        .get_matches();
+
+    let triggering = matches.is_present("trigger");
+    let printing = matches.is_present("print");
+    let daemonizing = matches.is_present("daemonize");
+
+
+    if triggering {
+        write(IN_FILE, "k").expect("Error writing to tmp in");
+    }
+
+    if daemonizing {
+        daemonize();
+    }
+
+    if printing {
+        let gained_time = read_to_string(TIME_GAINED_FILE).expect("Reading from tmp in failed");
+        println!("gained time: {:?}", gained_time);
+    }
+
 }
 
 
