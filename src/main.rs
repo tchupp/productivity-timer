@@ -12,6 +12,7 @@ const IN_FILE: &str = "/var/tmp/productivity-timer/in";
 const OUT_FILE: &str = "/var/tmp/productivity-timer/out";
 const ERR_FILE: &str = "/var/tmp/productivity-timer/err";
 const PID_FILE: &str = "/var/tmp/productivity-timer/timer.pid";
+const TIME_GAINED_FILE: &str = "/var/tmp/productivity-timer/time-gained";
 
 
 fn main() {
@@ -27,6 +28,7 @@ fn create_tmp_files () -> (File, File) {
     // We only need this created, not passed back. We won't use File for
     // the in-file below, but rather the &str constant IN_FILE
     create_tmp_file(IN_FILE, false /*append*/);
+    create_tmp_file(TIME_GAINED_FILE, false /*append*/);
     // TODO: decide if I should clean outfile
     clean_files_on_startup();
 
@@ -72,18 +74,39 @@ fn listen_for_durations () {
             }
             "p" =>  {
                 println!("println p");
-                let gained_time = get_duration_from_vec_of_tupled_instants(
-                    convert_vec_to_vec_of_tuples(
-                        durations.clone()
-                    )
-                );
+                let gained_time = report_time_gained(durations.clone());
                 println!("gained time: {:?}", gained_time);
             },
             _ => ()
         }
 
+        // treating `checked` as a convention for this fn requiring a condition be fulfilled (i.e.,
+        // an even number of durations) to actually write to the file
+        checked_write_time_gained_to_file(durations.clone());
         write(IN_FILE, "").expect("Error writing to tmp in");
     }
+}
+
+fn checked_write_time_gained_to_file (mut durations: Vec<Instant>) {
+    // TODO: make a fn for checking even/odd
+    if durations.len() % 2 != 0 {
+        durations.push(Instant::now())
+    }
+
+    let current_duration_gained = report_time_gained(durations);
+    let seconds = current_duration_gained.as_secs() % 60;
+    let minutes = (current_duration_gained.as_secs() / 60) % 60;
+    let hours = (current_duration_gained.as_secs() / 60) / 60;
+
+    write(TIME_GAINED_FILE, format!("{}:{}:{}", hours, minutes, seconds)).expect("Error writing to time gained file");
+}
+
+fn report_time_gained (durations: Vec<Instant>) -> Duration {
+    get_duration_from_vec_of_tupled_instants(
+        convert_vec_to_vec_of_tuples(
+            durations
+        )
+    )
 }
 
 fn convert_vec_to_vec_of_tuples(untupled_vec: Vec<Instant>) -> Vec<(Instant, Instant)> {
