@@ -1,13 +1,7 @@
 use clap::{App, Arg};
 
-use std::fs::{read_to_string, write};
-
 mod database;
 mod daemon;
-
-const IN_FILE: &str = "/var/tmp/productivity-timer/in";
-const TIME_GAINED_FILE: &str = "/var/tmp/productivity-timer/time-gained";
-
 
 fn main() {
     let matches = App::new("Productivity Timer")
@@ -47,44 +41,27 @@ fn main() {
     let completing_session = matches.is_present("complete");
 
     if completing_session {
-        complete_session();
-        print_saved_times();
+        daemon::complete_session();
+        daemon::print_saved_times();
     }
 
     if printing {
         match matches.value_of("print").unwrap() {
             "tmp" => {
-                let time_gained = get_time_gained();
+                let time_gained = daemon::get_time_gained();
                 println!("gained time: {:?}", time_gained);
             }
-            "db" => print_saved_times(),
+            "db" => daemon::print_saved_times(),
             _ => println!("Unrecognized command")
         }
     }
 
     if triggering {
-        write(IN_FILE, "k").expect("Error writing to tmp in");
+        daemon::trigger_time();
     }
 
     if daemonizing {
         daemon::init();
     }
 }
-
-fn print_saved_times() {
-    let times = database::get_times();
-    for time in times {
-        println!("gained time: {:?}", time);
-    }
-}
-
-fn complete_session() {
-    let time_gained = get_time_gained();
-    database::save_time_gained(time_gained).unwrap()
-}
-
-fn get_time_gained() -> String {
-    read_to_string(TIME_GAINED_FILE).expect("Reading from tmp in failed")
-}
-
 

@@ -4,6 +4,7 @@ use std::fs::{create_dir, read_to_string, write, File, OpenOptions};
 use std::time::{Duration, Instant};
 use std::thread::sleep;
 use std::process::exit;
+use crate::database;
 
 const PID_FILE: &str = "/var/tmp/productivity-timer/timer.pid";
 const WORKING_DIRECTORY: &str = "/var/tmp/productivity-timer";
@@ -85,15 +86,12 @@ fn listen_for_durations () {
         let input = read_to_string(IN_FILE).expect("Reading from tmp in failed");
         match input.trim() {
             "e" => {
-                println!("println exiting");
                 exit(0)
             }
             "k" =>  {
-                println!("println k");
                 durations.push(Instant::now())
             }
             "p" =>  {
-                println!("println p");
                 let gained_time = report_time_gained(durations.clone());
                 println!("gained time: {:?}", gained_time);
             },
@@ -133,6 +131,17 @@ fn reset_in_file () {
     write(IN_FILE, "").expect("Error writing to tmp in");
 }
 
+fn reset_time_gained_file () {
+    write(TIME_GAINED_FILE, "").expect("Error writing to tmp in");
+}
+
+pub fn complete_session() {
+    let time_gained = get_time_gained();
+    database::save_time_gained(time_gained).unwrap();
+    reset_in_file();
+    reset_time_gained_file();
+}
+
 fn convert_vec_to_vec_of_tuples(untupled_vec: Vec<Instant>) -> Vec<(Instant, Instant)> {
     if untupled_vec.len() % 2 != 0 {
         panic!("TODO: attempted to print timer before stopping it");
@@ -162,3 +171,17 @@ fn get_duration_from_vec_of_tupled_instants(tupled_vec: Vec<(Instant, Instant)>)
         .sum()
 }
 
+pub fn trigger_time() {
+    write(IN_FILE, "k").expect("Error writing to tmp in");
+}
+
+pub fn print_saved_times() {
+    let times = database::get_times();
+    for time in times {
+        println!("gained time: {:?}", time);
+    }
+}
+
+pub fn get_time_gained() -> String {
+    read_to_string(TIME_GAINED_FILE).expect("Reading from tmp in failed")
+}
