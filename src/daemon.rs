@@ -136,8 +136,15 @@ fn reset_time_gained_file () {
 }
 
 pub fn complete_session() {
+    //total_time               TEXT NOT NULL,
+    //number_of_durations      INTEGER,
+    //duration_avg             INTEGER
     let time_gained = get_time_gained();
-    database::save_time_gained(time_gained).unwrap();
+    database::save_time_gained(
+        time_gained,
+        number_of_durations,
+        avg_duration
+    ).unwrap();
     reset_in_file();
     reset_time_gained_file();
 }

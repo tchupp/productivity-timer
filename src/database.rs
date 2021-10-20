@@ -8,7 +8,11 @@ pub struct TimeGained {
     duration_avg: i32
 }
 
-pub fn save_time_gained(time_gained: String) -> Result<()> {
+pub fn save_time_gained(
+    time_gained: String,
+    number_of_durations: String,
+    avg_duration: String
+) -> Result<()> {
     // creates database if it doesn't already exist
     let conn = Connection::open("time_gained")?;
     println!("time_gained as arg: {}", time_gained);
