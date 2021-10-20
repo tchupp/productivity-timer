@@ -5,13 +5,13 @@ pub struct TimeGained {
     id: i32,
     total_time: String,
     number_of_durations: i32,
-    duration_avg: i32
+    duration_avg: i32,
 }
 
 pub fn save_time_gained(
     time_gained: String,
     number_of_durations: String,
-    avg_duration: String
+    avg_duration: String,
 ) -> Result<()> {
     // creates database if it doesn't already exist
     let conn = Connection::open("time_gained")?;
@@ -38,16 +38,20 @@ pub fn save_time_gained(
 pub fn get_times() -> Result<Vec<TimeGained>> {
     let conn = Connection::open("time_gained")?;
 
-    let mut stmt = conn.prepare("SELECT id, total_time, number_of_durations, duration_avg FROM time_gained")?;
+    let mut stmt =
+        conn.prepare("SELECT id, total_time, number_of_durations, duration_avg FROM time_gained")?;
 
-    let times: Vec<TimeGained> = stmt.query_map([], |row| {
-        Ok(TimeGained {
-            id: row.get(0)?,
-            total_time: row.get(1)?,
-            number_of_durations: row.get(2)?,
-            duration_avg: row.get(2)?,
-        })
-    })?.map(Result::unwrap).collect();
+    let times: Vec<TimeGained> = stmt
+        .query_map([], |row| {
+            Ok(TimeGained {
+                id: row.get(0)?,
+                total_time: row.get(1)?,
+                number_of_durations: row.get(2)?,
+                duration_avg: row.get(2)?,
+            })
+        })?
+        .map(Result::unwrap)
+        .collect();
 
     Ok(times)
 }

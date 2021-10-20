@@ -1,7 +1,7 @@
 use clap::{App, Arg};
 
-mod database;
 mod daemon;
+mod database;
 
 fn main() {
     let matches = App::new("Productivity Timer")
@@ -52,7 +52,7 @@ fn main() {
                 println!("gained time: {:?}", time_gained);
             }
             "db" => daemon::print_saved_times(),
-            _ => println!("Unrecognized command")
+            _ => println!("Unrecognized command"),
         }
     }
 
@@ -64,4 +64,3 @@ fn main() {
         daemon::init();
     }
 }
-
