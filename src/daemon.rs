@@ -1,24 +1,24 @@
 use crate::database;
 use daemonize::Daemonize;
+use dirs::home_dir;
+use std::convert::TryInto;
 use std::fs::{create_dir, read_to_string, write, File, OpenOptions};
 use std::path::Path;
 use std::process::exit;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-const PID_FILE: &str = "/var/tmp/productivity-timer/timer.pid";
-const WORKING_DIRECTORY: &str = "/var/tmp/productivity-timer";
-const IN_FILE: &str = "/var/tmp/productivity-timer/in";
-const OUT_FILE: &str = "/var/tmp/productivity-timer/out";
-const ERR_FILE: &str = "/var/tmp/productivity-timer/err";
-const TIME_GAINED_FILE: &str = "/var/tmp/productivity-timer/time-gained";
-
 pub fn init() {
-    let (tmp_file_out, tmp_file_err) = create_tmp_files();
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+
+    let pid_file = working_directory.to_string() + "/timer.pid";
+
+    let (tmp_file_out, tmp_file_err) = create_files();
 
     let daemonize = Daemonize::new()
-        .pid_file(PID_FILE)
-        .working_directory(WORKING_DIRECTORY)
+        .pid_file(pid_file)
+        .working_directory(working_directory)
         .stdout(tmp_file_out)
         .stderr(tmp_file_err)
         .exit_action(|| println!("TODO: exiting"));
@@ -32,15 +32,28 @@ pub fn init() {
     }
 }
 
-fn create_tmp_files() -> (File, File) {
+// TODO Pass in struct
+fn create_files() -> (File, File) {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+
+    let in_file = working_directory.to_string() + "/in";
+    let out_file = working_directory.to_string() + "/out";
+    let err_file = working_directory.to_string() + "/err";
+    let time_gained_file = working_directory.to_string() + "/time-gained";
+    let durations_count_file = working_directory.to_string() + "/durations-count";
+    let durations_avg_file = working_directory.to_string() + "/durations-average";
+
     create_tmp_productivity_timer_dir();
-    let tmp_file_out = create_tmp_file(OUT_FILE, false /*append*/);
-    let tmp_file_err = create_tmp_file(ERR_FILE, false /*append*/);
+    let tmp_file_out = create_file(&out_file, false /*append*/);
+    let tmp_file_err = create_file(&err_file, false /*append*/);
 
     // We only need this created, not passed back. We won't use File for
-    // the in-file below, but rather the &str constant IN_FILE
-    create_tmp_file(IN_FILE, false /*append*/);
-    create_tmp_file(TIME_GAINED_FILE, false /*append*/);
+    // the in-file below, but rather the &str constant in_file
+    create_file(&in_file, false /*append*/);
+    create_file(&time_gained_file, false /*append*/);
+    create_file(&durations_count_file, false /*append*/);
+    create_file(&durations_avg_file, false /*append*/);
     // TODO: decide if I should clean outfile
     reset_in_file();
 
@@ -48,15 +61,18 @@ fn create_tmp_files() -> (File, File) {
 }
 
 fn create_tmp_productivity_timer_dir() {
-    if !Path::new("/var/tmp/productivity-timer").exists() {
-        match create_dir(WORKING_DIRECTORY) {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+
+    if !Path::new(&working_directory).exists() {
+        match create_dir(working_directory) {
             Ok(_) => (),
             Err(e) => eprintln!("Error, {}", e),
         }
     }
 }
 
-fn create_tmp_file(file_name: &str, append: bool) -> File {
+fn create_file(file_name: &str, append: bool) -> File {
     if append {
         return OpenOptions::new()
             .read(true)
@@ -74,6 +90,15 @@ fn create_tmp_file(file_name: &str, append: bool) -> File {
         .unwrap()
 }
 
+fn read_from_in_file() -> String {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+
+    let in_file = working_directory.to_string() + "/in";
+
+    read_to_string(&in_file).expect("Reading from tmp in failed")
+}
+
 fn listen_for_durations() {
     let mut durations: Vec<Instant> = Vec::new();
 
@@ -82,9 +107,16 @@ fn listen_for_durations() {
     loop {
         sleep(half_second);
 
-        let input = read_to_string(IN_FILE).expect("Reading from tmp in failed");
+        let input = read_from_in_file();
         match input.trim() {
             "e" => exit(0),
+            // TODO: find a better way to reset durations on session completions
+            "c" => {
+                reset_in_file();
+                println!("made it!");
+                durations = Vec::new();
+                complete_session();
+            }
             "k" => durations.push(Instant::now()),
             "p" => {
                 let gained_time = report_time_gained(durations.clone());
@@ -93,16 +125,22 @@ fn listen_for_durations() {
             _ => (),
         }
 
-        // treating `checked` as a convention for this fn requiring a condition be fulfilled (i.e.,
-        // an even number of durations) to actually write to the file
+        // On each loop, update time gained, duration count, average files
         checked_write_time_gained_to_file(durations.clone());
-        write(IN_FILE, "").expect("Error writing to tmp in");
+        reset_in_file();
     }
 }
 
 fn checked_write_time_gained_to_file(mut durations: Vec<Instant>) {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let time_gained_file = working_directory.to_string() + "/time-gained";
+    let durations_count_file = working_directory.to_string() + "/durations-count";
+    let durations_avg_file = working_directory.to_string() + "/durations-average";
+
+    let durations_len = durations.len();
     // TODO: make a fn for checking even/odd
-    if durations.len() % 2 != 0 {
+    if durations_len % 2 != 0 {
         durations.push(Instant::now())
     }
 
@@ -111,8 +149,26 @@ fn checked_write_time_gained_to_file(mut durations: Vec<Instant>) {
     let minutes = (current_duration_gained.as_secs() / 60) % 60;
     let hours = (current_duration_gained.as_secs() / 60) / 60;
 
+    let durations_count: u64 = (durations_len / 2).try_into().unwrap();
+
+    // TODO: add something to guard against dividing by zero
+    if durations_count > 0 {
+        let avg_seconds = (current_duration_gained.as_secs() / durations_count) % 60;
+        let avg_minutes = ((current_duration_gained.as_secs() / durations_count) / 60) % 60;
+        let avg_hours = ((current_duration_gained.as_secs() / durations_count) / 60) / 60;
+
+        write(durations_count_file, format!("{}", durations_count))
+            .expect("Error writing to durations count file");
+
+        write(
+            durations_avg_file,
+            format!("{}:{}:{}", avg_hours, avg_minutes, avg_seconds),
+        )
+        .expect("Error writing to duration averages file");
+    }
+
     write(
-        TIME_GAINED_FILE,
+        time_gained_file,
         format!("{}:{}:{}", hours, minutes, seconds),
     )
     .expect("Error writing to time gained file");
@@ -123,23 +179,40 @@ fn report_time_gained(durations: Vec<Instant>) -> Duration {
 }
 
 fn reset_in_file() {
-    write(IN_FILE, "").expect("Error writing to tmp in");
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+
+    let in_file = working_directory.to_string() + "/in";
+
+    write(in_file, "").expect("Error writing to tmp in");
 }
 
 fn reset_time_gained_file() {
-    write(TIME_GAINED_FILE, "").expect("Error writing to tmp in");
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+
+    let time_gained_file = working_directory.to_string() + "/time-gained";
+    println!("in reset_time_gained");
+    write(time_gained_file, "").expect("Error writing to tmp in");
 }
 
-pub fn complete_session() {
-    //total_time               TEXT NOT NULL,
-    //number_of_durations      INTEGER,
-    //duration_avg             INTEGER
+// TODO: consolidate session completion fns and figure out a better way to do it
+pub fn trigger_session_completion() {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let in_file = working_directory.to_string() + "/in";
+    write(in_file, "c").expect("Error writing to tmp in");
+}
+
+fn complete_session() {
     let time_gained = get_time_gained();
-    database::save_time_gained(time_gained, number_of_durations, avg_duration).unwrap();
-    reset_in_file();
+    let durations_count = get_durations_count();
+    let durations_avg = get_durations_avg();
+
+    // TODO: error handling
+    database::save_time_gained(time_gained, durations_count, durations_avg).unwrap();
     reset_time_gained_file();
 }
-
 fn convert_vec_to_vec_of_tuples(untupled_vec: Vec<Instant>) -> Vec<(Instant, Instant)> {
     if untupled_vec.len() % 2 != 0 {
         panic!("TODO: attempted to print timer before stopping it");
@@ -168,7 +241,11 @@ fn get_duration_from_vec_of_tupled_instants(tupled_vec: Vec<(Instant, Instant)>)
 }
 
 pub fn trigger_time() {
-    write(IN_FILE, "k").expect("Error writing to tmp in");
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+
+    let in_file = working_directory.to_string() + "/in";
+    write(in_file, "k").expect("Error writing to tmp in");
 }
 
 pub fn print_saved_times() {
@@ -179,5 +256,26 @@ pub fn print_saved_times() {
 }
 
 pub fn get_time_gained() -> String {
-    read_to_string(TIME_GAINED_FILE).expect("Reading from tmp in failed")
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let time_gained_file = working_directory.to_string() + "/time-gained";
+    read_to_string(time_gained_file).expect("Reading from time gained file failed")
+}
+
+fn get_durations_count() -> u32 {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let durations_count_file = working_directory.to_string() + "/durations-count";
+    read_to_string(durations_count_file)
+        .expect("Reading from duration count file failed")
+        .parse::<u32>()
+        .unwrap()
+}
+
+fn get_durations_avg() -> String {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let durations_avg_file = working_directory.to_string() + "/durations-average";
+
+    read_to_string(durations_avg_file).expect("Reading from duration average file failed")
 }
