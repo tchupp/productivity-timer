@@ -41,7 +41,7 @@ fn main() {
     let completing_session = matches.is_present("complete");
 
     if completing_session {
-        daemon::complete_session();
+        daemon::trigger_session_completion();
         daemon::print_saved_times();
     }
 
