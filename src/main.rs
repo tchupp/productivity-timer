@@ -2,6 +2,7 @@ use clap::{App, Arg};
 
 mod daemon;
 mod database;
+mod interface;
 
 fn main() {
     let matches = App::new("Productivity Timer")
@@ -28,6 +29,12 @@ fn main() {
                 .help("Prints from two places, either `db` for what's been saved or `tmp` for what's in /var/tmp/productivity-timer/time-gained.")
         )
         .arg(
+            Arg::with_name("interface")
+                .short("i")
+                .long("interface")
+                .help("Opens a terminal interface.")
+        )
+        .arg(
             Arg::with_name("complete")
                 .short("c")
                 .long("complete")
@@ -38,6 +45,7 @@ fn main() {
     let triggering = matches.is_present("trigger");
     let daemonizing = matches.is_present("daemonize");
     let printing = matches.is_present("print");
+    let interface = matches.is_present("interface");
     let completing_session = matches.is_present("complete");
 
     if completing_session {
@@ -62,5 +70,9 @@ fn main() {
 
     if daemonizing {
         daemon::init();
+    }
+
+    if interface {
+        interface::hello_world().unwrap();
     }
 }
