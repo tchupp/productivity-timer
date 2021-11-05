@@ -145,17 +145,62 @@ fn checked_write_time_gained_to_file(mut durations: Vec<Instant>) {
     }
 
     let current_duration_gained = report_time_gained(durations);
-    let seconds = current_duration_gained.as_secs() % 60;
-    let minutes = (current_duration_gained.as_secs() / 60) % 60;
-    let hours = (current_duration_gained.as_secs() / 60) / 60;
+
+    let seconds_raw = current_duration_gained.as_secs() % 60;
+    let minutes_raw = (current_duration_gained.as_secs() / 60) % 60;
+    let hours_raw = (current_duration_gained.as_secs() / 60) / 60;
+
+    let seconds: String;
+    let minutes: String;
+    let hours: String;
+
+    if seconds_raw < 10 {
+        seconds = "0".to_owned() + &seconds_raw.to_string();
+    } else {
+        seconds = seconds_raw.to_string();
+    }
+
+    if minutes_raw < 10 {
+        minutes = "0".to_owned() + &minutes_raw.to_string();
+    } else {
+        minutes = minutes_raw.to_string();
+    }
+
+    if hours_raw < 10 {
+        hours = "0".to_owned() + &hours_raw.to_string();
+    } else {
+        hours = hours_raw.to_string();
+    }
 
     let durations_count: u64 = (durations_len / 2).try_into().unwrap();
 
     // TODO: add something to guard against dividing by zero
     if durations_count > 0 {
-        let avg_seconds = (current_duration_gained.as_secs() / durations_count) % 60;
-        let avg_minutes = ((current_duration_gained.as_secs() / durations_count) / 60) % 60;
-        let avg_hours = ((current_duration_gained.as_secs() / durations_count) / 60) / 60;
+        // TODO: DRY this shit up
+        let avg_seconds_raw = (current_duration_gained.as_secs() / durations_count) % 60;
+        let avg_minutes_raw = ((current_duration_gained.as_secs() / durations_count) / 60) % 60;
+        let avg_hours_raw = ((current_duration_gained.as_secs() / durations_count) / 60) / 60;
+
+        let avg_seconds: String;
+        if avg_seconds_raw < 10 {
+            avg_seconds = "0".to_owned() + &avg_seconds_raw.to_string();
+        } else {
+            avg_seconds = avg_seconds_raw.to_string();
+        }
+
+        let avg_minutes: String;
+        if avg_minutes_raw < 10 {
+            avg_minutes = "0".to_owned() + &avg_minutes_raw.to_string();
+        } else {
+            avg_minutes = avg_minutes_raw.to_string();
+        }
+
+        let avg_hours: String;
+        if avg_hours_raw < 10 {
+            avg_hours = "0".to_owned() + &avg_hours_raw.to_string();
+        } else {
+            avg_hours = avg_hours_raw.to_string();
+        }
 
         write(durations_count_file, format!("{}", durations_count))
             .expect("Error writing to durations count file");

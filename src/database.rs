@@ -31,6 +31,8 @@ pub fn save_time_gained(
     };
 
     // TODO: interpolate the database name to make it dynamic
+    // SQLite doesnt have a storage class set aside for storing dates and/or times. We can
+    // use TEXT and the time fns will work with it (supposedly)
     match conn.execute(
         "CREATE TABLE IF NOT EXISTS time_gained (
             id                          INTEGER PRIMARY KEY,
@@ -63,19 +65,28 @@ pub fn save_time_gained(
     Ok(())
 }
 
-pub fn get_times() -> Result<Vec<TimeGained>> {
+// TODO: better typing
+#[derive(Debug)]
+pub struct TimeGainedModified {
+    id: i32,
+    pub total_time: i32,
+    durations_count: i32,
+    durations_avg: String,
+}
+pub fn get_times() -> Result<Vec<TimeGainedModified>> {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
     let database = working_directory + "/" + &DATABASE_NAME.to_string();
     let conn = Connection::open(database)?;
 
     // TODO: interpolate the database name to make it dynamic
+    // Use sqlite3's datetime fns to get total seconds
     let mut stmt =
-        conn.prepare("SELECT id, total_time, durations_count, durations_avg FROM time_gained")?;
+        conn.prepare("SELECT id, strftime('%s', total_time) - strftime('%s', '00:00:00'), durations_count, durations_avg FROM time_gained")?;
 
-    let times: Vec<TimeGained> = stmt
+    let times: Vec<TimeGainedModified> = stmt
         .query_map([], |row| {
-            Ok(TimeGained {
+            Ok(TimeGainedModified {
                 id: row.get(0)?,
                 total_time: row.get(1)?,
                 durations_count: row.get(2)?,
