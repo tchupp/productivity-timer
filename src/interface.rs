@@ -1,6 +1,5 @@
 // https://monkeypatch.io/blog/2021/2021-05-31-rust-tui/
 // https://github.com/ilaborie/plop-tui/blob/blog/step-1/src/app/ui.rs
-//
 use crate::database;
 
 use std::convert::TryInto;
@@ -17,8 +16,10 @@ pub fn hello_world() -> Result<(), Error> {
     // TODO: why do I need the lock?
     let stdin = stdin();
     let stdin = stdin.lock();
+
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
     terminal.clear()?;
     terminal.hide_cursor()?;
 
@@ -35,16 +36,16 @@ pub fn hello_world() -> Result<(), Error> {
                 ])
                 .split(f.size());
 
-            let title = draw_title();
-            f.render_widget(title, chunks[0]);
+            let overview = database::get_lifetime_overview().unwrap()[0].to_string();
+            f.render_widget(draw_overview(overview), chunks[0]);
 
-            let mut data: Vec<(&str, u64)> = vec![];
-            let times = database::get_times();
+            let mut total_times: Vec<(&str, u64)> = vec![];
+            let times = database::get_total_time_as_seconds();
             for time in times.unwrap() {
-                data.push(("", time.total_time.try_into().unwrap()));
+                total_times.push(("", time.total_time.try_into().unwrap()));
             }
 
-            let durations_barchart = draw_barchart(&data);
+            let durations_barchart = draw_barchart(&total_times);
             f.render_widget(durations_barchart, chunks[1]);
         })?;
 
@@ -60,12 +61,13 @@ pub fn hello_world() -> Result<(), Error> {
     Ok(())
 }
 
-fn draw_title<'a>() -> Paragraph<'a> {
-    Paragraph::new("Hello, world")
+fn draw_overview<'a>(overview: String) -> Paragraph<'a> {
+    Paragraph::new(overview)
         .style(Style::default().fg(Color::LightCyan))
         .alignment(Alignment::Center)
         .block(
             Block::default()
+                .title("Overview")
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White)),
         )

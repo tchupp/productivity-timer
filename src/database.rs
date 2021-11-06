@@ -1,15 +1,8 @@
 use dirs::home_dir;
 use rusqlite::{params, Connection, Result};
+use std::fmt;
 
 const DATABASE_NAME: &str = "time_gained";
-
-#[derive(Debug)]
-pub struct TimeGained {
-    id: i32,
-    total_time: String,
-    durations_count: i32,
-    durations_avg: String,
-}
 
 pub fn save_time_gained(
     time_gained: String,
@@ -65,15 +58,16 @@ pub fn save_time_gained(
     Ok(())
 }
 
-// TODO: better typing
+// TODO: reconsider typing
 #[derive(Debug)]
-pub struct TimeGainedModified {
+pub struct TimeGained {
     id: i32,
-    pub total_time: i32,
+    total_time: String,
     durations_count: i32,
     durations_avg: String,
 }
-pub fn get_times() -> Result<Vec<TimeGainedModified>> {
+
+pub fn get_times() -> Result<Vec<TimeGained>> {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
     let database = working_directory + "/" + &DATABASE_NAME.to_string();
@@ -84,9 +78,9 @@ pub fn get_times() -> Result<Vec<TimeGainedModified>> {
     let mut stmt =
         conn.prepare("SELECT id, strftime('%s', total_time) - strftime('%s', '00:00:00'), durations_count, durations_avg FROM time_gained")?;
 
-    let times: Vec<TimeGainedModified> = stmt
+    let times: Vec<TimeGained> = stmt
         .query_map([], |row| {
-            Ok(TimeGainedModified {
+            Ok(TimeGained {
                 id: row.get(0)?,
                 total_time: row.get(1)?,
                 durations_count: row.get(2)?,
@@ -97,4 +91,74 @@ pub fn get_times() -> Result<Vec<TimeGainedModified>> {
         .collect();
 
     Ok(times)
+}
+
+// TODO: reconsider typing
+#[derive(Debug)]
+pub struct LifetimeOverview {
+    lifetime_total_time_avg: String,
+    lifetime_durations_avg: String,
+}
+
+impl fmt::Display for LifetimeOverview {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "average total time: {}\n average duration: {}",
+            self.lifetime_total_time_avg, self.lifetime_durations_avg
+        )
+    }
+}
+
+pub fn get_lifetime_overview() -> Result<Vec<LifetimeOverview>> {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let database = working_directory + "/" + &DATABASE_NAME.to_string();
+    let conn = Connection::open(database)?;
+
+    // TODO: interpolate the database name to make it dynamic
+    // Use sqlite3's datetime fns to get total seconds
+    let mut stmt =
+        conn.prepare("SELECT time(sum(strftime('%s', total_time) - strftime('%s', '00:00:00')) / count(total_time), 'unixepoch'), time(sum(strftime('%s', durations_avg) - strftime('%s', '00:00:00')) / count(durations_avg), 'unixepoch') FROM time_gained")?;
+
+    let times: Vec<LifetimeOverview> = stmt
+        .query_map([], |row| {
+            Ok(LifetimeOverview {
+                lifetime_total_time_avg: row.get(0)?,
+                lifetime_durations_avg: row.get(1)?,
+            })
+        })?
+        .map(Result::unwrap)
+        .collect();
+
+    Ok(times)
+}
+
+#[derive(Debug)]
+pub struct TotalTimeAsSeconds {
+    pub total_time: i32,
+}
+
+pub fn get_total_time_as_seconds() -> Result<Vec<TotalTimeAsSeconds>> {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let database = working_directory + "/" + &DATABASE_NAME.to_string();
+    let conn = Connection::open(database)?;
+
+    // TODO: interpolate the database name to make it dynamic
+    // Use sqlite3's datetime fns to get total seconds
+    let mut stmt = conn.prepare(
+        "SELECT strftime('%s', total_time) - strftime('%s', '00:00:00') FROM time_gained",
+    )?;
+
+    let total_times: Vec<TotalTimeAsSeconds> = stmt
+        .query_map([], |row| {
+            Ok(TotalTimeAsSeconds {
+                total_time: row.get(0)?,
+            })
+        })?
+        .map(Result::unwrap)
+        .collect();
+
+    Ok(total_times)
 }
