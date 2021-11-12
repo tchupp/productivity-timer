@@ -40,8 +40,9 @@ pub fn hello_world() -> Result<(), Error> {
             f.render_widget(draw_overview(overview), chunks[0]);
 
             let mut total_times: Vec<(&str, u64)> = vec![];
-            let times = database::get_total_time_as_seconds();
-            for time in times.unwrap() {
+            let times = database::get_total_time_as_seconds().unwrap();
+
+            for time in times {
                 total_times.push(("", time.total_time.try_into().unwrap()));
             }
 
