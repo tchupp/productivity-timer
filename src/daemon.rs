@@ -117,6 +117,7 @@ fn listen_for_durations() {
             "c" => {
                 reset_in_file();
                 durations = Vec::new();
+                additions = Vec::new();
                 // TODO: clean up the completion logic; it actually sets /time-gained
                 // to an empty string and (accidentally) relies on the
                 // `checked_write_time_gained_to_file` to set it to 00:00:00
