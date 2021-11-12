@@ -1,6 +1,7 @@
 use crate::database;
 use daemonize::Daemonize;
 use dirs::home_dir;
+use regex::Regex;
 use std::convert::TryInto;
 use std::fs::{create_dir, read_to_string, write, File, OpenOptions};
 use std::path::Path;
@@ -90,6 +91,7 @@ fn create_file(file_name: &str, append: bool) -> File {
         .unwrap()
 }
 
+// TODO: generalize this fn to be the only reader fn (e.g., the misc reader fn)
 fn read_from_in_file() -> String {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
@@ -101,6 +103,7 @@ fn read_from_in_file() -> String {
 
 fn listen_for_durations() {
     let mut durations: Vec<Instant> = Vec::new();
+    let mut additions: Vec<Duration> = Vec::new();
 
     let half_second = Duration::from_millis(500);
 
@@ -113,38 +116,48 @@ fn listen_for_durations() {
             // TODO: find a better way to reset durations on session completions
             "c" => {
                 reset_in_file();
-                println!("made it!");
                 durations = Vec::new();
+                // TODO: clean up the completion logic; it actually sets /time-gained
+                // to an empty string and (accidentally) relies on the
+                // `checked_write_time_gained_to_file` to set it to 00:00:00
                 complete_session();
             }
             "k" => durations.push(Instant::now()),
             "p" => {
-                let gained_time = report_time_gained(durations.clone());
+                // TODO: figure out whether there's a perf gain to & instead
+                let gained_time = report_time_gained(durations.clone(), additions.clone());
                 println!("gained time: {:?}", gained_time);
+            }
+            "a" => {
+                let minutes_to_add: u64 = get_misc().parse().unwrap();
+                let addition = Duration::new(minutes_to_add * 60, 0);
+                additions.push(addition);
             }
             _ => (),
         }
 
         // On each loop, update time gained, duration count, average files
-        checked_write_time_gained_to_file(durations.clone());
+        // TODO: `checked` has a standard meaning in rust; revise this to be some other name
+        checked_write_time_gained_to_file(durations.clone(), additions.clone());
         reset_in_file();
     }
 }
 
-fn checked_write_time_gained_to_file(mut durations: Vec<Instant>) {
+fn checked_write_time_gained_to_file(mut durations: Vec<Instant>, additions: Vec<Duration>) {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
     let time_gained_file = working_directory.to_string() + "/time-gained";
     let durations_count_file = working_directory.to_string() + "/durations-count";
     let durations_avg_file = working_directory.to_string() + "/durations-average";
 
+    // NB: this won't include additions
     let durations_len = durations.len();
     // TODO: make a fn for checking even/odd
     if durations_len % 2 != 0 {
         durations.push(Instant::now())
     }
 
-    let current_duration_gained = report_time_gained(durations);
+    let current_duration_gained = report_time_gained(durations, additions);
 
     let seconds_raw = current_duration_gained.as_secs() % 60;
     let minutes_raw = (current_duration_gained.as_secs() / 60) % 60;
@@ -219,8 +232,30 @@ fn checked_write_time_gained_to_file(mut durations: Vec<Instant>) {
     .expect("Error writing to time gained file");
 }
 
-fn report_time_gained(durations: Vec<Instant>) -> Duration {
-    get_duration_from_vec_of_tupled_instants(convert_vec_to_vec_of_tuples(durations))
+fn get_misc() -> String {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let misc_file = working_directory.to_string() + "/misc";
+    read_to_string(&misc_file).expect("Reading from misc file failed")
+}
+
+pub fn add_minutes(minutes_to_add: String) {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let in_file = working_directory.to_string() + "/in";
+    let misc_file = working_directory.to_string() + "/misc";
+
+    let re = Regex::new(r"^\d+$").unwrap();
+    assert!(re.is_match("15"));
+    // TODO: better error message/handling if failed regex
+    assert!(re.is_match(&minutes_to_add));
+
+    write(in_file, "a").expect("Error writing to time gained file");
+    write(misc_file, minutes_to_add).expect("Error writing to misc file");
+}
+
+fn report_time_gained(durations: Vec<Instant>, additions: Vec<Duration>) -> Duration {
+    get_duration_from_vec_of_tupled_instants(convert_vec_to_vec_of_tuples(durations), additions)
 }
 
 fn reset_in_file() {
@@ -232,13 +267,14 @@ fn reset_in_file() {
     write(in_file, "").expect("Error writing to tmp in");
 }
 
-fn reset_time_gained_file() {
+fn zero_out_time_gained_file() {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
 
     let time_gained_file = working_directory.to_string() + "/time-gained";
     println!("in reset_time_gained");
-    write(time_gained_file, "").expect("Error writing to tmp in");
+    // TODO: consider writing 00:00:00
+    write(time_gained_file, "").expect("Error writing to time-gained");
 }
 
 // TODO: consolidate session completion fns and figure out a better way to do it
@@ -246,7 +282,7 @@ pub fn trigger_session_completion() {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
     let in_file = working_directory.to_string() + "/in";
-    write(in_file, "c").expect("Error writing to tmp in");
+    write(in_file, "c").expect("Error writing to /in");
 }
 
 fn complete_session() {
@@ -256,8 +292,9 @@ fn complete_session() {
 
     // TODO: error handling
     database::save_time_gained(time_gained, durations_count, durations_avg).unwrap();
-    reset_time_gained_file();
+    zero_out_time_gained_file();
 }
+
 fn convert_vec_to_vec_of_tuples(untupled_vec: Vec<Instant>) -> Vec<(Instant, Instant)> {
     if untupled_vec.len() % 2 != 0 {
         panic!("TODO: attempted to print timer before stopping it");
@@ -271,8 +308,12 @@ fn convert_vec_to_vec_of_tuples(untupled_vec: Vec<Instant>) -> Vec<(Instant, Ins
     tupled_vec
 }
 
-fn get_duration_from_vec_of_tupled_instants(tupled_vec: Vec<(Instant, Instant)>) -> Duration {
-    let durations_from_tuples: Vec<Duration> = tupled_vec
+fn get_duration_from_vec_of_tupled_instants(
+    tupled_vec: Vec<(Instant, Instant)>,
+    additions: Vec<Duration>,
+) -> Duration {
+    // mut for .extend()
+    let mut durations_from_tuples: Vec<Duration> = tupled_vec
         .iter()
         .map(|tuple| match tuple.1.checked_duration_since(tuple.0) {
             Some(v) => v,
@@ -281,6 +322,8 @@ fn get_duration_from_vec_of_tupled_instants(tupled_vec: Vec<(Instant, Instant)>)
             }
         })
         .collect();
+
+    durations_from_tuples.extend(additions);
 
     durations_from_tuples.iter().sum()
 }
