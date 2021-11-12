@@ -7,6 +7,8 @@ use std::fs::{create_dir, read_to_string, write, File, OpenOptions};
 use std::path::Path;
 use std::process::exit;
 use std::thread::sleep;
+// TODO: apparently chrono supports negative durations (or some representation of time); it'd
+// probably be smart to pull out std::time in favor of that to make -s, --subtract easier
 use std::time::{Duration, Instant};
 
 pub fn init() {
@@ -231,6 +233,13 @@ fn checked_write_time_gained_to_file(mut durations: Vec<Instant>, additions: Vec
         format!("{}:{}:{}", hours, minutes, seconds),
     )
     .expect("Error writing to time gained file");
+}
+
+fn reset_misc() {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let misc_file = working_directory.to_string() + "/misc";
+    write(misc_file, "");
 }
 
 fn get_misc() -> String {
