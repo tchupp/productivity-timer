@@ -135,6 +135,7 @@ fn listen_for_durations() {
                 let minutes_to_add: u64 = get_misc().parse().unwrap();
                 let addition = Duration::new(minutes_to_add * 60, 0);
                 additions.push(addition);
+                reset_misc();
             }
             _ => (),
         }
