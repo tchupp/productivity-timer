@@ -62,7 +62,7 @@ pub fn save_time_gained(
 #[derive(Debug)]
 pub struct TimeGained {
     id: i32,
-    total_time: String,
+    total_time: i32,
     durations_count: i32,
     durations_avg: String,
 }
