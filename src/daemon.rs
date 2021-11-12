@@ -240,7 +240,7 @@ fn reset_misc() {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
     let misc_file = working_directory.to_string() + "/misc";
-    write(misc_file, "");
+    write(misc_file, "").expect("Problem writing to misc file");
 }
 
 fn get_misc() -> String {
