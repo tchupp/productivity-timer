@@ -4,26 +4,25 @@ use std::fmt;
 
 const DATABASE_NAME: &str = "time_gained";
 
+fn database_filename() -> String {
+    let working_directory =
+        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
+    let filename = working_directory + "/" + &DATABASE_NAME.to_string();
+    filename
+}
+
+fn connect_to_database() -> Result<Connection, rusqlite::Error> {
+    let database = database_filename();
+    Connection::open(database)
+}
+
 pub fn save_time_gained(
     time_gained: String,
     durations_count: u32,
     durations_avg: String,
 ) -> Result<()> {
-    let working_directory =
-        home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
-    let database = working_directory + "/" + &DATABASE_NAME.to_string();
+    let conn = connect_to_database()?;
 
-    // TODO: switch back to ? rather than matches
-    // creates database if it doesn't already exist
-    let conn = match Connection::open(database) {
-        Ok(conn) => conn,
-        Err(e) => {
-            println!("error opening db");
-            return Err(e);
-        }
-    };
-
-    // TODO: interpolate the database name to make it dynamic
     // SQLite doesnt have a storage class set aside for storing dates and/or times. We can
     // use TEXT and the time fns will work with it (supposedly)
     match conn.execute(
@@ -43,7 +42,6 @@ pub fn save_time_gained(
         }
     };
 
-    // TODO: interpolate the database name to make it dynamic
     match conn.execute(
         "INSERT INTO time_gained (total_time, durations_count, durations_avg) VALUES (?1, ?2, ?3)",
         params![time_gained, durations_count, durations_avg],
