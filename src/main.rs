@@ -64,7 +64,7 @@ fn main() {
     if printing {
         match matches.value_of("print").unwrap() {
             "tmp" => {
-                let time_gained = daemon::get_time_gained();
+                let time_gained = daemon::get_time_gained().unwrap();
                 println!("{:?}", time_gained);
             }
             "db" => daemon::print_saved_times(),
