@@ -92,11 +92,6 @@ fn read_from_in_file() -> Result<String, Error> {
     read_to_string(&in_filepath)
 }
 
-    let in_file = working_directory.to_string() + "/in";
-
-    read_to_string(&in_file).expect("Reading from tmp in failed")
-}
-
 fn listen_for_durations() {
     let mut durations: Vec<Instant> = Vec::new();
     let mut additions: Vec<Duration> = Vec::new();
