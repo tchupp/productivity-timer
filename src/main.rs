@@ -65,7 +65,7 @@ fn main() {
         match matches.value_of("print").unwrap() {
             "tmp" => {
                 let time_gained = daemon::get_time_gained();
-                println!("gained time: {:?}", time_gained);
+                println!("{:?}", time_gained);
             }
             "db" => daemon::print_saved_times(),
             _ => println!("Unrecognized command"),
