@@ -57,7 +57,7 @@ fn main() {
     let completing_session = matches.is_present("complete");
 
     if completing_session {
-        daemon::trigger_session_completion();
+        daemon::trigger_session_completion().unwrap();
         daemon::print_saved_times();
     }
 
@@ -75,11 +75,11 @@ fn main() {
     if adding_minutes {
         // handle regex in supporting fn
         let minutes_to_add = matches.value_of("add").unwrap().to_string();
-        daemon::add_minutes(minutes_to_add);
+        daemon::add_minutes(minutes_to_add).unwrap();
     }
 
     if triggering {
-        daemon::trigger_time();
+        daemon::trigger_time().unwrap();
     }
 
     if daemonizing {
