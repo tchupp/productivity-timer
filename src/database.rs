@@ -56,6 +56,37 @@ pub fn save_time_gained(
     Ok(())
 }
 
+pub fn _save_task(name: String) -> Result<()> {
+    let conn = connect_to_database()?;
+
+    // SQLite doesnt have a storage class set aside for storing dates and/or times. We can
+    // use TEXT and the time fns will work with it (supposedly)
+    match conn.execute(
+        "CREATE TABLE IF NOT EXISTS tasks (
+            id                          INTEGER PRIMARY KEY,
+            name                        TEXT NOT NULL,
+        )",
+        [],
+    ) {
+        // TODO: figure out what .. actually does
+        Ok(..) => (),
+        Err(e) => {
+            println!("error creating table: {:?}", e);
+            return Err(e);
+        }
+    };
+
+    match conn.execute("INSERT INTO tasks (name) VALUES (?1)", params![name]) {
+        Ok(..) => (),
+        Err(e) => {
+            println!("error inserting into db: {:?}", e);
+            return Err(e);
+        }
+    };
+
+    Ok(())
+}
+
 // TODO: reconsider typing
 #[derive(Debug)]
 pub struct TimeGained {
