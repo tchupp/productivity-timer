@@ -92,12 +92,62 @@ fn read_from_in_file() -> Result<String, Error> {
     read_to_string(&in_filepath)
 }
 
-    let in_file = working_directory.to_string() + "/in";
+struct Session {
+    id: u64,
+    durations: Vec<PTDuration>,
+    active: bool,
+}
 
-    read_to_string(&in_file).expect("Reading from tmp in failed")
+impl Session {
+    fn new() -> Session {
+        // save new database session
+        // get id from database session
+        Session {
+            id: 1234, // get id from database saving
+            durations: Vec::new(),
+            active: false,
+        }
+    }
+
+    fn record_time(&mut self, tag: Option<String>) {
+        self.durations.push(PTDuration::new(tag));
+        self.active = true;
+    }
+
+    fn pause(&mut self) {
+        let active_duration = self.durations.last_mut().unwrap();
+        active_duration.end();
+        self.active = false;
+    }
+    //fn complete(&self) {}
+}
+
+#[derive(Debug)]
+struct PTDuration {
+    tag: Option<String>,
+    time_gained: Option<Duration>,
+    begin: Instant,
+    end: Option<Instant>,
+}
+
+impl PTDuration {
+    fn new(tag: Option<String>) -> PTDuration {
+        PTDuration {
+            tag: Some(tag).unwrap(),
+            time_gained: None,
+            begin: Instant::now(),
+            end: None,
+        }
+    }
+
+    fn end(&mut self) {
+        self.end = Some(Instant::now());
+    }
 }
 
 fn listen_for_durations() {
+    let mut session = Session::new();
+    println!("{:?}", session.id);
     let mut durations: Vec<Instant> = Vec::new();
     let mut additions: Vec<Duration> = Vec::new();
 
@@ -119,7 +169,15 @@ fn listen_for_durations() {
                 // `checked_write_time_gained_to_file` to set it to 00:00:00
                 complete_session();
             }
-            "t" => durations.push(Instant::now()),
+            "t" => {
+                match session.active {
+                    // TODO: figure out best way to take in flags for stuff like tags
+                    true => session.pause(),
+                    false => session.record_time(None),
+                }
+                //println!("{:?}", session.durations.last());
+            }
+            //durations.push(Instant::now()),
             "p" => {
                 // TODO: figure out whether there's a perf gain to & instead
                 let gained_time = report_time_gained(durations.clone(), additions.clone());
