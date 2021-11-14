@@ -19,6 +19,7 @@ fn main() {
             Arg::with_name("trigger")
                 .short("t")
                 .long("trigger")
+                .takes_value(true)
                 .help("Records a moment in time, either the beginning or end of a duration.")
         )
         .arg(
@@ -79,7 +80,14 @@ fn main() {
     }
 
     if triggering {
-        daemon::trigger_time().unwrap();
+        match matches.value_of("trigger") {
+            Some(tag) => {
+                daemon::trigger_time(Some(tag.to_string())).unwrap();
+            }
+            None => {
+                daemon::trigger_time(None).unwrap();
+            }
+        }
     }
 
     if daemonizing {

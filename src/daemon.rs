@@ -133,7 +133,7 @@ struct PTDuration {
 impl PTDuration {
     fn new(tag: Option<String>) -> PTDuration {
         PTDuration {
-            tag: Some(tag).unwrap(),
+            tag,
             time_gained: None,
             begin: Instant::now(),
             end: None,
@@ -147,7 +147,6 @@ impl PTDuration {
 
 fn listen_for_durations() {
     let mut session = Session::new();
-    println!("{:?}", session.id);
     let mut durations: Vec<Instant> = Vec::new();
     let mut additions: Vec<Duration> = Vec::new();
 
@@ -170,14 +169,21 @@ fn listen_for_durations() {
                 complete_session();
             }
             "t" => {
+                //durations.push(Instant::now()),
                 match session.active {
                     // TODO: figure out best way to take in flags for stuff like tags
                     true => session.pause(),
-                    false => session.record_time(None),
+                    false => {
+                        let tag = get_tag().unwrap();
+                        match tag {
+                            Some(tag) => {
+                                session.record_time(Some(tag));
+                            }
+                            None => session.record_time(None),
+                        }
+                    }
                 }
-                //println!("{:?}", session.durations.last());
             }
-            //durations.push(Instant::now()),
             "p" => {
                 // TODO: figure out whether there's a perf gain to & instead
                 let gained_time = report_time_gained(durations.clone(), additions.clone());
@@ -302,6 +308,22 @@ fn get_misc() -> Result<String, Error> {
     Ok(read_to_string(&misc_filepath)?)
 }
 
+fn reset_tag_file() -> Result<(), Error> {
+    let tag_filepath = get_filepath("tag")?;
+    write(tag_filepath, "").expect("Problem writing to tag file");
+    Ok(())
+}
+
+fn get_tag() -> Result<Option<String>, Error> {
+    let tag_filepath = get_filepath("tag")?;
+    let tag = read_to_string(&tag_filepath).unwrap();
+    if tag != "" {
+        Ok(Some(tag))
+    } else {
+        Ok(None)
+    }
+}
+
 pub fn add_minutes(minutes_to_add: String) -> Result<(), Error> {
     let in_filepath = get_filepath("in")?;
     let misc_filepath = get_filepath("misc")?;
@@ -393,6 +415,7 @@ fn get_filepath(filename: &str) -> Result<String, Error> {
         "out" => Ok(working_directory + filename),
         "err" => Ok(working_directory + filename),
         "misc" => Ok(working_directory + filename),
+        "tag" => Ok(working_directory + filename),
         "timer.pid" => Ok(working_directory + filename),
         "time-gained" => Ok(working_directory + filename),
         "durations-count" => Ok(working_directory + filename),
@@ -404,10 +427,18 @@ fn get_filepath(filename: &str) -> Result<String, Error> {
     }
 }
 
-pub fn trigger_time() -> Result<(), Error> {
+pub fn trigger_time(tag: Option<String>) -> Result<(), Error> {
     let filepath = get_filepath("in")?;
+    let tag_filepath = get_filepath("tag")?;
     write(filepath, "t")?;
-    Ok(())
+
+    match tag {
+        Some(v) => {
+            write(tag_filepath, v).expect("Error writing to misc file");
+            Ok(())
+        }
+        None => Ok(()),
+    }
 }
 
 pub fn print_saved_times() {
