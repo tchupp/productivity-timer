@@ -80,6 +80,7 @@ fn main() {
     }
 
     if triggering {
+        println!("wtf?");
         match matches.value_of("trigger") {
             Some(tag) => {
                 daemon::trigger_time(Some(tag.to_string())).unwrap();

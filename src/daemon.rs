@@ -92,21 +92,25 @@ fn read_from_in_file() -> Result<String, Error> {
     read_to_string(&in_filepath)
 }
 
+#[derive(Debug)]
 struct Session {
     id: u64,
     durations: Vec<PTDuration>,
     active: bool,
+    time_gained: Option<Duration>,
 }
 
 impl Session {
     fn new() -> Session {
         // save new database session
         // get id from database session
-        Session {
+        let mut session = Session {
             id: 1234, // get id from database saving
             durations: Vec::new(),
             active: false,
-        }
+            time_gained: None,
+        };
+        session
     }
 
     fn record_time(&mut self, tag: Option<String>) {
@@ -117,9 +121,72 @@ impl Session {
     fn pause(&mut self) {
         let active_duration = self.durations.last_mut().unwrap();
         active_duration.end();
+        active_duration.time_gained = active_duration
+            .end
+            .unwrap()
+            .checked_duration_since(active_duration.begin);
+
         self.active = false;
     }
     //fn complete(&self) {}
+
+    fn update_time_gained(&mut self) {
+        if self.durations.len() != 0 {
+            let current_instants: Vec<Duration> = self
+                .durations
+                .iter()
+                .map(|duration| match duration.time_gained {
+                    Some(time_gained) => time_gained,
+                    None => Instant::now()
+                        .checked_duration_since(duration.begin)
+                        .unwrap(),
+                })
+                .collect();
+
+            let time_gained: Duration = current_instants.iter().sum();
+
+            // TODO: handle additions
+
+            self.time_gained = Some(time_gained);
+        }
+    }
+
+    fn get_time_gained_formatted(&self) -> String {
+        match self.time_gained {
+            Some(v) => format_instant_to_hhmmss(v),
+            None => "00:00:00".to_string(),
+        }
+    }
+}
+
+fn format_instant_to_hhmmss(time_gained: Duration) -> String {
+    let seconds_raw = time_gained.as_secs() % 60;
+    let minutes_raw = (time_gained.as_secs() / 60) % 60;
+    let hours_raw = (time_gained.as_secs() / 60) / 60;
+
+    let seconds: String;
+    let minutes: String;
+    let hours: String;
+
+    if seconds_raw < 10 {
+        seconds = "0".to_owned() + &seconds_raw.to_string();
+    } else {
+        seconds = seconds_raw.to_string();
+    }
+
+    if minutes_raw < 10 {
+        minutes = "0".to_owned() + &minutes_raw.to_string();
+    } else {
+        minutes = minutes_raw.to_string();
+    }
+
+    if hours_raw < 10 {
+        hours = "0".to_owned() + &hours_raw.to_string();
+    } else {
+        hours = hours_raw.to_string();
+    }
+
+    format!("{}:{}:{}", hours, minutes, seconds)
 }
 
 #[derive(Debug)]
@@ -197,6 +264,9 @@ fn listen_for_durations() {
             }
             _ => (),
         }
+
+        session.update_time_gained();
+        println!("time_gained: {:?}", session.get_time_gained_formatted());
 
         // On each loop, update time gained, duration count, average files
         // TODO: `checked` has a standard meaning in rust; revise this to be some other name
@@ -428,13 +498,16 @@ fn get_filepath(filename: &str) -> Result<String, Error> {
 }
 
 pub fn trigger_time(tag: Option<String>) -> Result<(), Error> {
+    println!("in trigger_time");
     let filepath = get_filepath("in")?;
     let tag_filepath = get_filepath("tag")?;
+    println!("in_file called");
     write(filepath, "t")?;
+    println!("after writing to in file");
 
     match tag {
         Some(v) => {
-            write(tag_filepath, v).expect("Error writing to misc file");
+            write(tag_filepath, v).expect("Error writing to tag file");
             Ok(())
         }
         None => Ok(()),
