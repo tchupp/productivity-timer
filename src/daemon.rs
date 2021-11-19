@@ -95,8 +95,10 @@ fn read_from_in_file() -> Result<String, Error> {
 #[derive(Debug)]
 struct Analytics {
     time_gained: Option<Duration>,
-    duration_avg: Option<Duration>,
-    duration_count: Option<i32>,
+    // TODO: probably should be a Duration, but going for the visual stuff before the true analytic
+    // stuff
+    duration_avg: Option<String>,
+    duration_count: Option<u64>,
 }
 
 impl Analytics {
@@ -130,6 +132,55 @@ impl Analytics {
             Some(v) => format_instant_to_hhmmss(v),
             None => "00:00:00".to_string(),
         }
+    }
+
+    fn update_duration_count(&mut self) {
+        // TODO: figure out if unwrapping a None for Option<i32> defaults to 0? Seems to, given no
+        // warnings from the compiler? Who knows, hello future Aaron as you finally figure out this
+        // is the bug you're struggling with.
+        self.duration_count = Some(self.duration_count.unwrap() + 1);
+    }
+
+    fn get_duration_count(self) -> u64 {
+        self.duration_count.unwrap()
+    }
+
+    fn update_duration_avg(&mut self) {
+        let avg_seconds_raw =
+            (self.time_gained.unwrap().as_secs() / self.duration_count.unwrap()) % 60;
+        let avg_minutes_raw =
+            ((self.time_gained.unwrap().as_secs() / self.duration_count.unwrap()) / 60) % 60;
+        let avg_hours_raw =
+            ((self.time_gained.unwrap().as_secs() / self.duration_count.unwrap()) / 60) / 60;
+
+        // TODO: gotta be beautiful
+        let avg_seconds: String;
+
+        if avg_seconds_raw < 10 {
+            avg_seconds = "0".to_owned() + &avg_seconds_raw.to_string();
+        } else {
+            avg_seconds = avg_seconds_raw.to_string();
+        }
+
+        let avg_minutes: String;
+        if avg_minutes_raw < 10 {
+            avg_minutes = "0".to_owned() + &avg_minutes_raw.to_string();
+        } else {
+            avg_minutes = avg_minutes_raw.to_string();
+        }
+
+        let avg_hours: String;
+        if avg_hours_raw < 10 {
+            avg_hours = "0".to_owned() + &avg_hours_raw.to_string();
+        } else {
+            avg_hours = avg_hours_raw.to_string();
+        }
+
+        self.duration_avg = Some(format!("{}:{}:{}", avg_hours, avg_minutes, avg_seconds));
+    }
+
+    fn get_duration_avg(self) -> String {
+        self.duration_avg.unwrap()
     }
 }
 
@@ -166,8 +217,12 @@ impl Session {
             .unwrap()
             .checked_duration_since(active_duration.begin);
 
+        self.analytics.update_duration_count();
+
         self.active = false;
     }
+
+    // TODO: impl
     //fn complete(&self) {}
 
     fn update_time_gained(&mut self) {
@@ -291,97 +346,6 @@ fn listen_for_durations() {
     }
 }
 
-fn checked_write_time_gained_to_file(
-    mut durations: Vec<Instant>,
-    additions: Vec<Duration>,
-) -> Result<(), Error> {
-    let time_gained_filepath = get_filepath("time-gained")?;
-    let durations_count_filepath = get_filepath("durations-count")?;
-    let durations_avg_filepath = get_filepath("durations-average")?;
-
-    // NB: this won't include additions
-    let durations_len = durations.len();
-    // TODO: make a fn for checking even/odd
-    if durations_len % 2 != 0 {
-        durations.push(Instant::now())
-    }
-
-    let current_duration_gained = report_time_gained(durations, additions);
-
-    let seconds_raw = current_duration_gained.as_secs() % 60;
-    let minutes_raw = (current_duration_gained.as_secs() / 60) % 60;
-    let hours_raw = (current_duration_gained.as_secs() / 60) / 60;
-
-    let seconds: String;
-    let minutes: String;
-    let hours: String;
-
-    if seconds_raw < 10 {
-        seconds = "0".to_owned() + &seconds_raw.to_string();
-    } else {
-        seconds = seconds_raw.to_string();
-    }
-
-    if minutes_raw < 10 {
-        minutes = "0".to_owned() + &minutes_raw.to_string();
-    } else {
-        minutes = minutes_raw.to_string();
-    }
-
-    if hours_raw < 10 {
-        hours = "0".to_owned() + &hours_raw.to_string();
-    } else {
-        hours = hours_raw.to_string();
-    }
-
-    let durations_count: u64 = (durations_len / 2).try_into().unwrap();
-
-    // TODO: add something to guard against dividing by zero
-    if durations_count > 0 {
-        // TODO: DRY this shit up
-        let avg_seconds_raw = (current_duration_gained.as_secs() / durations_count) % 60;
-        let avg_minutes_raw = ((current_duration_gained.as_secs() / durations_count) / 60) % 60;
-        let avg_hours_raw = ((current_duration_gained.as_secs() / durations_count) / 60) / 60;
-
-        let avg_seconds: String;
-        if avg_seconds_raw < 10 {
-            avg_seconds = "0".to_owned() + &avg_seconds_raw.to_string();
-        } else {
-            avg_seconds = avg_seconds_raw.to_string();
-        }
-
-        let avg_minutes: String;
-        if avg_minutes_raw < 10 {
-            avg_minutes = "0".to_owned() + &avg_minutes_raw.to_string();
-        } else {
-            avg_minutes = avg_minutes_raw.to_string();
-        }
-
-        let avg_hours: String;
-        if avg_hours_raw < 10 {
-            avg_hours = "0".to_owned() + &avg_hours_raw.to_string();
-        } else {
-            avg_hours = avg_hours_raw.to_string();
-        }
-
-        write(durations_count_filepath, format!("{}", durations_count))
-            .expect("Error writing to durations count file");
-
-        write(
-            durations_avg_filepath,
-            format!("{}:{}:{}", avg_hours, avg_minutes, avg_seconds),
-        )
-        .expect("Error writing to duration averages file");
-    }
-
-    write(
-        time_gained_filepath,
-        format!("{}:{}:{}", hours, minutes, seconds),
-    )
-    .expect("Error writing to time gained file");
-    Ok(())
-}
-
 // TODO: make into struct with methods for getting/resetting?
 fn reset_misc() -> Result<(), Error> {
     let misc_filepath = get_filepath("misc")?;
@@ -392,12 +356,6 @@ fn reset_misc() -> Result<(), Error> {
 fn get_misc() -> Result<String, Error> {
     let misc_filepath = get_filepath("misc")?;
     Ok(read_to_string(&misc_filepath)?)
-}
-
-fn reset_tag_file() -> Result<(), Error> {
-    let tag_filepath = get_filepath("tag")?;
-    write(tag_filepath, "").expect("Problem writing to tag file");
-    Ok(())
 }
 
 fn get_tag() -> Result<Option<String>, Error> {
