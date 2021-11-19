@@ -93,11 +93,52 @@ fn read_from_in_file() -> Result<String, Error> {
 }
 
 #[derive(Debug)]
+struct Analytics {
+    time_gained: Option<Duration>,
+    duration_avg: Option<Duration>,
+    duration_count: Option<i32>,
+}
+
+impl Analytics {
+    fn new() -> Analytics {
+        Analytics {
+            time_gained: None,
+            duration_avg: None,
+            duration_count: None,
+        }
+    }
+
+    fn update_time_gained(&mut self, durations: &Vec<PTDuration>) {
+        let current_instants: Vec<Duration> = durations
+            .iter()
+            .map(|duration| match duration.time_gained {
+                Some(time_gained) => time_gained,
+                None => Instant::now()
+                    .checked_duration_since(duration.begin)
+                    .unwrap(),
+            })
+            .collect();
+
+        let time_gained: Duration = current_instants.iter().sum();
+
+        // TODO: handle additions
+        self.time_gained = Some(time_gained);
+    }
+
+    fn get_time_gained_formatted(&self) -> String {
+        match self.time_gained {
+            Some(v) => format_instant_to_hhmmss(v),
+            None => "00:00:00".to_string(),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Session {
     id: u64,
     durations: Vec<PTDuration>,
     active: bool,
-    time_gained: Option<Duration>,
+    analytics: Analytics,
 }
 
 impl Session {
@@ -108,7 +149,7 @@ impl Session {
             id: 1234, // get id from database saving
             durations: Vec::new(),
             active: false,
-            time_gained: None,
+            analytics: Analytics::new(),
         }
     }
 
@@ -131,29 +172,7 @@ impl Session {
 
     fn update_time_gained(&mut self) {
         if self.durations.len() != 0 {
-            let current_instants: Vec<Duration> = self
-                .durations
-                .iter()
-                .map(|duration| match duration.time_gained {
-                    Some(time_gained) => time_gained,
-                    None => Instant::now()
-                        .checked_duration_since(duration.begin)
-                        .unwrap(),
-                })
-                .collect();
-
-            let time_gained: Duration = current_instants.iter().sum();
-
-            // TODO: handle additions
-
-            self.time_gained = Some(time_gained);
-        }
-    }
-
-    fn get_time_gained_formatted(&self) -> String {
-        match self.time_gained {
-            Some(v) => format_instant_to_hhmmss(v),
-            None => "00:00:00".to_string(),
+            self.analytics.update_time_gained(&self.durations);
         }
     }
 }
@@ -266,12 +285,8 @@ fn listen_for_durations() {
         }
 
         session.update_time_gained();
-        let time_gained = session.get_time_gained_formatted();
+        let time_gained = session.analytics.get_time_gained_formatted();
         set_time_gained(time_gained).expect("Error writing to time-gained file");
-
-        // On each loop, update time gained, duration count, average files
-        // TODO: `checked` has a standard meaning in rust; revise this to be some other name
-        //checked_write_time_gained_to_file(durations.clone(), additions.clone()).unwrap();
         reset_in_file().unwrap();
     }
 }
