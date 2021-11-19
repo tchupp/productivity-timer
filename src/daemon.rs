@@ -104,13 +104,12 @@ impl Session {
     fn new() -> Session {
         // save new database session
         // get id from database session
-        let mut session = Session {
+        Session {
             id: 1234, // get id from database saving
             durations: Vec::new(),
             active: false,
             time_gained: None,
-        };
-        session
+        }
     }
 
     fn record_time(&mut self, tag: Option<String>) {
@@ -251,6 +250,7 @@ fn listen_for_durations() {
                     }
                 }
             }
+            // TODO: deprecate
             "p" => {
                 // TODO: figure out whether there's a perf gain to & instead
                 let gained_time = report_time_gained(durations.clone(), additions.clone());
@@ -266,11 +266,12 @@ fn listen_for_durations() {
         }
 
         session.update_time_gained();
-        println!("time_gained: {:?}", session.get_time_gained_formatted());
+        let time_gained = session.get_time_gained_formatted();
+        set_time_gained(time_gained).expect("Error writing to time-gained file");
 
         // On each loop, update time gained, duration count, average files
         // TODO: `checked` has a standard meaning in rust; revise this to be some other name
-        checked_write_time_gained_to_file(durations.clone(), additions.clone()).unwrap();
+        //checked_write_time_gained_to_file(durations.clone(), additions.clone()).unwrap();
         reset_in_file().unwrap();
     }
 }
@@ -498,12 +499,9 @@ fn get_filepath(filename: &str) -> Result<String, Error> {
 }
 
 pub fn trigger_time(tag: Option<String>) -> Result<(), Error> {
-    println!("in trigger_time");
     let filepath = get_filepath("in")?;
     let tag_filepath = get_filepath("tag")?;
-    println!("in_file called");
     write(filepath, "t")?;
-    println!("after writing to in file");
 
     match tag {
         Some(v) => {
@@ -524,6 +522,12 @@ pub fn print_saved_times() {
 pub fn get_time_gained() -> Result<String, Error> {
     let filepath = get_filepath("time-gained")?;
     Ok(read_to_string(filepath)?)
+}
+
+fn set_time_gained(time_gained: String) -> Result<(), Error> {
+    let filepath = get_filepath("time-gained")?;
+    write(filepath, time_gained)?;
+    Ok(())
 }
 
 fn get_durations_count() -> Result<u32, Error> {

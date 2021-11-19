@@ -26,7 +26,6 @@ fn main() {
             Arg::with_name("print")
                 .short("p")
                 .long("print")
-                .takes_value(true)
                 .help("Prints from two places, either `db` for what's been saved or `tmp` for what's in /var/tmp/productivity-timer/time-gained.")
         )
         .arg(
@@ -63,14 +62,8 @@ fn main() {
     }
 
     if printing {
-        match matches.value_of("print").unwrap() {
-            "tmp" => {
-                let time_gained = daemon::get_time_gained().unwrap();
-                println!("{:?}", time_gained);
-            }
-            "db" => daemon::print_saved_times(),
-            _ => println!("Unrecognized command"),
-        }
+        let time_gained = daemon::get_time_gained().unwrap();
+        println!("{:?}", time_gained);
     }
 
     if adding_minutes {
@@ -80,7 +73,6 @@ fn main() {
     }
 
     if triggering {
-        println!("wtf?");
         match matches.value_of("trigger") {
             Some(tag) => {
                 daemon::trigger_time(Some(tag.to_string())).unwrap();
