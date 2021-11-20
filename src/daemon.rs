@@ -2,7 +2,6 @@ use crate::database;
 use daemonize::Daemonize;
 use dirs::home_dir;
 use regex::Regex;
-use std::convert::TryInto;
 use std::fs::{create_dir, read_to_string, write, File, OpenOptions};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
@@ -445,7 +444,6 @@ fn get_duration_from_vec_of_tupled_instants(
         .collect();
 
     durations_from_tuples.extend(additions);
-
     durations_from_tuples.iter().sum()
 }
 
