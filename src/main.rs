@@ -1,8 +1,11 @@
 use clap::{App, Arg};
 
+mod analytics;
 mod daemon;
 mod database;
 mod interface;
+mod pt_duration;
+mod session;
 
 fn main() {
     let matches = App::new("Productivity Timer")
