@@ -61,7 +61,10 @@ fn main() {
 
     if completing_session {
         daemon::trigger_session_completion().unwrap();
-        daemon::print_saved_times();
+        let times = database::get_times();
+        for time in times {
+            println!("gained time: {:?}", time);
+        }
     }
 
     if printing {

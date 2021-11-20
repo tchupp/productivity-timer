@@ -1,14 +1,15 @@
-use crate::pt_duration::PTDuration;
+use crate::analytics::Analytics;
 use crate::daemon::format_instant_to_hhmmss;
 use crate::database;
+use crate::pt_duration::PTDuration;
 use core::time::Duration;
-use crate::analytics::Analytics;
 use std::convert::TryInto;
 
 // TODO: only private data fields, add getters/setters
 #[derive(Debug)]
 pub struct Session {
-    id: u64,
+    // TODO only pub to debug daemon
+    pub id: u64,
     durations: Vec<PTDuration>,
     additions: Vec<PTDuration>,
     pub active: bool,
@@ -17,10 +18,11 @@ pub struct Session {
 
 impl Session {
     pub fn new() -> Session {
-        // save new database session
-        // get id from database session
+        let id = database::new_session().unwrap();
+        println!("id from new session: {}", id);
+
         Session {
-            id: 1234, // get id from database saving
+            id,
             durations: Vec::new(),
             additions: Vec::new(),
             active: false,
@@ -78,6 +80,7 @@ impl Session {
             formatted_time_gained,
             self.analytics.duration_count.unwrap().try_into().unwrap(),
             duration_avg,
+            self.id,
         )
         .unwrap();
     }

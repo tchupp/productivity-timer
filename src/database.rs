@@ -1,7 +1,9 @@
 use dirs::home_dir;
 use rusqlite::{params, Connection, Result};
+use std::convert::TryInto;
 use std::fmt;
 
+// TODO better db name
 const DATABASE_NAME: &str = "time_gained";
 
 fn database_filename() -> String {
@@ -16,72 +18,55 @@ fn connect_to_database() -> Result<Connection, rusqlite::Error> {
     Connection::open(database)
 }
 
+pub fn new_session() -> Result<u64> {
+    let conn = connect_to_database()?;
+
+    // TODO: move thesxe table creation queries to connect_to_database
+    // SQLite doesnt have a storage class set aside for storing dates and/or times. We can
+    // use TEXT and the time fns will work with it (supposedly)
+    match conn.execute(
+        "CREATE TABLE IF NOT EXISTS sessions (
+            id                          INTEGER PRIMARY KEY,
+            total_time                  TEXT,
+            durations_count             INTEGER,
+            durations_avg               TEXT
+        )",
+        [],
+    ) {
+        Ok(..) => (),
+        Err(e) => panic!("error creating sessions table: {}", e),
+    };
+
+    let mut stmt = conn.prepare("INSERT INTO sessions DEFAULT VALUES returning id")?;
+
+    struct Id {
+        id: u64,
+    }
+
+    // TODO: fix this query to not be a map--just a simple execute, but rough with rusqlite so
+    // hacked into place
+    let ids: Vec<Id> = stmt
+        .query_map([], |row| Ok(Id { id: row.get(0)? }))?
+        .map(Result::unwrap)
+        .collect();
+
+    let id = ids[0].id;
+
+    Ok(id)
+}
 pub fn save_time_gained(
     time_gained: String,
     durations_count: u32,
     durations_avg: String,
+    session_id: u64,
 ) -> Result<()> {
     let conn = connect_to_database()?;
-
-    // SQLite doesnt have a storage class set aside for storing dates and/or times. We can
-    // use TEXT and the time fns will work with it (supposedly)
     match conn.execute(
-        "CREATE TABLE IF NOT EXISTS time_gained (
-            id                          INTEGER PRIMARY KEY,
-            total_time                  TEXT NOT NULL,
-            durations_count             INTEGER NOT NULL,
-            durations_avg               TEXT NOT NULL
-        )",
-        [],
-    ) {
-        // TODO: figure out what .. actually does
-        Ok(..) => (),
-        Err(e) => {
-            println!("error creating table: {:?}", e);
-            return Err(e);
-        }
-    };
-
-    match conn.execute(
-        "INSERT INTO time_gained (total_time, durations_count, durations_avg) VALUES (?1, ?2, ?3)",
-        params![time_gained, durations_count, durations_avg],
+        "UPDATE sessions SET (total_time, durations_count, durations_avg) = (?1, ?2, ?3) WHERE id = ?4",
+        params![time_gained, durations_count, durations_avg, session_id],
     ) {
         Ok(..) => (),
-        Err(e) => {
-            println!("error inserting into db: {:?}", e);
-            return Err(e);
-        }
-    };
-
-    Ok(())
-}
-
-pub fn _save_task(name: String) -> Result<()> {
-    let conn = connect_to_database()?;
-
-    // SQLite doesnt have a storage class set aside for storing dates and/or times. We can
-    // use TEXT and the time fns will work with it (supposedly)
-    match conn.execute(
-        "CREATE TABLE IF NOT EXISTS tasks (
-            id                          INTEGER PRIMARY KEY,
-            name                        TEXT NOT NULL,
-        )",
-        [],
-    ) {
-        // TODO: figure out what .. actually does
-        Ok(..) => (),
-        Err(e) => {
-            println!("error creating table: {:?}", e);
-            return Err(e);
-        }
-    };
-
-    match conn.execute("INSERT INTO tasks (name) VALUES (?1)", params![name]) {
-        Ok(..) => (),
-        Err(e) => {
-            println!("error inserting into db: {:?}", e);
-            return Err(e);
-        }
+        Err(e) =>panic!("error inserting into db: {:?}", e)
     };
 
     Ok(())
@@ -105,7 +90,7 @@ pub fn get_times() -> Result<Vec<TimeGained>> {
     // TODO: interpolate the database name to make it dynamic
     // Use sqlite3's datetime fns to get total seconds
     let mut stmt =
-        conn.prepare("SELECT id, strftime('%s', total_time) - strftime('%s', '00:00:00'), durations_count, durations_avg FROM time_gained")?;
+        conn.prepare("SELECT id, strftime('%s', total_time) - strftime('%s', '00:00:00'), durations_count, durations_avg FROM sessions WHERE total_time IS NOT NULL")?;
 
     let times: Vec<TimeGained> = stmt
         .query_map([], |row| {
@@ -148,7 +133,7 @@ pub fn get_lifetime_overview() -> Result<Vec<LifetimeOverview>> {
     // TODO: interpolate the database name to make it dynamic
     // Use sqlite3's datetime fns to get total seconds
     let mut stmt =
-        conn.prepare("SELECT time(sum(strftime('%s', total_time) - strftime('%s', '00:00:00')) / count(total_time), 'unixepoch'), time(sum(strftime('%s', durations_avg) - strftime('%s', '00:00:00')) / count(durations_avg), 'unixepoch') FROM time_gained")?;
+        conn.prepare("SELECT time(sum(strftime('%s', total_time) - strftime('%s', '00:00:00')) / count(total_time), 'unixepoch'), time(sum(strftime('%s', durations_avg) - strftime('%s', '00:00:00')) / count(durations_avg), 'unixepoch') FROM sessions")?;
 
     let times: Vec<LifetimeOverview> = stmt
         .query_map([], |row| {
@@ -176,9 +161,8 @@ pub fn get_total_time_as_seconds() -> Result<Vec<TotalTimeAsSeconds>> {
 
     // TODO: interpolate the database name to make it dynamic
     // Use sqlite3's datetime fns to get total seconds
-    let mut stmt = conn.prepare(
-        "SELECT strftime('%s', total_time) - strftime('%s', '00:00:00') FROM time_gained",
-    )?;
+    let mut stmt = conn
+        .prepare("SELECT strftime('%s', total_time) - strftime('%s', '00:00:00') FROM sessions")?;
 
     let total_times: Vec<TotalTimeAsSeconds> = stmt
         .query_map([], |row| {

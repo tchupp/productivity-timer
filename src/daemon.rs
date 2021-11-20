@@ -1,4 +1,3 @@
-use crate::database;
 use crate::session::Session;
 use daemonize::Daemonize;
 use dirs::home_dir;
@@ -26,6 +25,61 @@ pub fn init() {
     match daemonize.start() {
         Ok(_) => listen_for_durations(),
         Err(e) => eprintln!("Error, {}", e),
+    }
+}
+
+fn listen_for_durations() {
+    let mut session = Session::new();
+    let half_second = Duration::from_millis(500);
+
+    loop {
+        sleep(half_second);
+
+        let input = read_from_in_file().unwrap();
+        match input.trim() {
+            "e" => exit(0),
+            "c" => {
+                session.save_session();
+                session = Session::new();
+            }
+            "t" => {
+                match session.active {
+                    // TODO: figure out best way to take in flags for stuff like tags
+                    true => session.pause(),
+                    false => {
+                        // TODO: DRY/refactor this logic (in -a, too)
+                        let tag = get_tag().unwrap();
+                        match tag {
+                            Some(tag) => {
+                                session.record_time(Some(tag));
+                            }
+                            None => session.record_time(None),
+                        }
+                    }
+                }
+            }
+            // TODO: deprecate
+            "p" => {
+                let time_gained = session.analytics.get_time_gained_formatted();
+                println!("gained time: {:?}", time_gained);
+            }
+            "a" => {
+                let minutes_to_add: u64 = get_misc().unwrap().parse().unwrap();
+
+                // TODO: support tags
+                session.record_addition(minutes_to_add);
+
+                reset_misc().unwrap();
+            }
+            _ => (),
+        }
+
+        session.update_time_gained();
+        // TODO: figure out best strategy for updating time gained: file? -p running every few
+        // seconds? Cf i3bar/zsh and see what feels best
+        let time_gained = session.analytics.get_time_gained_formatted();
+        set_time_gained(time_gained).expect("Error writing to time-gained file");
+        reset_in_file().unwrap();
     }
 }
 
@@ -120,62 +174,6 @@ pub fn format_instant_to_hhmmss(time_gained: Duration) -> String {
     format!("{}:{}:{}", hours, minutes, seconds)
 }
 
-fn listen_for_durations() {
-    let mut session = Session::new();
-    let half_second = Duration::from_millis(500);
-
-    loop {
-        sleep(half_second);
-
-        let input = read_from_in_file().unwrap();
-        match input.trim() {
-            "e" => exit(0),
-            // TODO: find a better way to reset durations on session completions
-            "c" => {
-                session.save_session();
-                session = Session::new();
-            }
-            "t" => {
-                match session.active {
-                    // TODO: figure out best way to take in flags for stuff like tags
-                    true => session.pause(),
-                    false => {
-                        // TODO: DRY/refactor this logic (in -a, too)
-                        let tag = get_tag().unwrap();
-                        match tag {
-                            Some(tag) => {
-                                session.record_time(Some(tag));
-                            }
-                            None => session.record_time(None),
-                        }
-                    }
-                }
-            }
-            // TODO: deprecate
-            "p" => {
-                let time_gained = session.analytics.get_time_gained_formatted();
-                println!("gained time: {:?}", time_gained);
-            }
-            "a" => {
-                let minutes_to_add: u64 = get_misc().unwrap().parse().unwrap();
-
-                // TODO: support tags
-                session.record_addition(minutes_to_add);
-
-                reset_misc().unwrap();
-            }
-            _ => (),
-        }
-
-        session.update_time_gained();
-        // TODO: figure out best strategy for updating time gained: file? -p running every few
-        // seconds? Cf i3bar/zsh and see what feels best
-        let time_gained = session.analytics.get_time_gained_formatted();
-        set_time_gained(time_gained).expect("Error writing to time-gained file");
-        reset_in_file().unwrap();
-    }
-}
-
 // TODO: make into struct with methods for getting/resetting?
 fn reset_misc() -> Result<(), Error> {
     let misc_filepath = get_filepath("misc")?;
@@ -218,13 +216,6 @@ fn reset_in_file() -> Result<(), Error> {
     Ok(())
 }
 
-//fn zero_out_time_gained_file() -> Result<(), Error> {
-//    let time_gained_filepath = get_filepath("time-gained")?;
-//    // TODO: consider writing 00:00:00
-//    write(time_gained_filepath, "").expect("Error writing to time-gained");
-//    Ok(())
-//}
-
 // TODO: consolidate session completion fns and figure out a better way to do it
 pub fn trigger_session_completion() -> Result<(), Error> {
     let in_filepath = get_filepath("in")?;
@@ -265,13 +256,6 @@ pub fn trigger_time(tag: Option<String>) -> Result<(), Error> {
             Ok(())
         }
         None => Ok(()),
-    }
-}
-
-pub fn print_saved_times() {
-    let times = database::get_times();
-    for time in times {
-        println!("gained time: {:?}", time);
     }
 }
 
