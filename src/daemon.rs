@@ -2,6 +2,7 @@ use crate::database;
 use daemonize::Daemonize;
 use dirs::home_dir;
 use regex::Regex;
+use std::convert::TryInto;
 use std::fs::{create_dir, read_to_string, write, File, OpenOptions};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
@@ -134,10 +135,12 @@ impl Analytics {
     }
 
     fn update_duration_count(&mut self) {
-        // TODO: figure out if unwrapping a None for Option<i32> defaults to 0? Seems to, given no
-        // warnings from the compiler? Who knows, hello future Aaron as you finally figure out this
-        // is the bug you're struggling with.
-        self.duration_count = Some(self.duration_count.unwrap() + 1);
+        let duration_count = match self.duration_count {
+            Some(v) => v,
+            None => 0,
+        };
+
+        self.duration_count = Some(duration_count + 1);
     }
 
     fn get_duration_count(self) -> u64 {
@@ -145,6 +148,10 @@ impl Analytics {
     }
 
     fn update_duration_avg(&mut self) {
+        if self.time_gained == None {
+            return;
+        }
+
         let avg_seconds_raw =
             (self.time_gained.unwrap().as_secs() / self.duration_count.unwrap()) % 60;
         let avg_minutes_raw =
@@ -152,7 +159,6 @@ impl Analytics {
         let avg_hours_raw =
             ((self.time_gained.unwrap().as_secs() / self.duration_count.unwrap()) / 60) / 60;
 
-        // TODO: gotta be beautiful
         let avg_seconds: String;
 
         if avg_seconds_raw < 10 {
@@ -217,17 +223,33 @@ impl Session {
             .checked_duration_since(active_duration.begin);
 
         self.analytics.update_duration_count();
-
+        self.analytics.update_duration_avg();
         self.active = false;
     }
-
-    // TODO: impl
-    //fn complete(&self) {}
 
     fn update_time_gained(&mut self) {
         if self.durations.len() != 0 {
             self.analytics.update_time_gained(&self.durations);
         }
+    }
+
+    fn save_session(self) {
+        let formatted_time_gained = match self.analytics.time_gained {
+            Some(v) => format_instant_to_hhmmss(v),
+            None => "00:00:00".to_string(),
+        };
+
+        let duration_avg = match self.analytics.duration_avg {
+            Some(v) => v.to_string(),
+            None => 0.to_string(),
+        };
+
+        database::save_time_gained(
+            formatted_time_gained,
+            self.analytics.duration_count.unwrap().try_into().unwrap(),
+            duration_avg,
+        )
+        .unwrap();
     }
 }
 
@@ -299,13 +321,11 @@ fn listen_for_durations() {
             "e" => exit(0),
             // TODO: find a better way to reset durations on session completions
             "c" => {
-                reset_in_file().unwrap();
-                durations = Vec::new();
-                additions = Vec::new();
-                // TODO: clean up the completion logic; it actually sets /time-gained
-                // to an empty string and (accidentally) relies on the
-                // `checked_write_time_gained_to_file` to set it to 00:00:00
-                complete_session();
+                //additions = Vec::new();
+
+                //zero_out_time_gained_file().unwrap();
+                session.save_session();
+                session = Session::new();
             }
             "t" => {
                 //durations.push(Instant::now()),
@@ -403,16 +423,6 @@ pub fn trigger_session_completion() -> Result<(), Error> {
     let in_filepath = get_filepath("in")?;
     write(in_filepath, "c").expect("Error writing to /in");
     Ok(())
-}
-
-fn complete_session() {
-    let time_gained = get_time_gained().unwrap();
-    let durations_count = get_durations_count().unwrap();
-    let durations_avg = get_durations_avg().unwrap();
-
-    // TODO: error handling
-    database::save_time_gained(time_gained, durations_count, durations_avg).unwrap();
-    zero_out_time_gained_file().unwrap();
 }
 
 fn convert_vec_to_vec_of_tuples(untupled_vec: Vec<Instant>) -> Vec<(Instant, Instant)> {
