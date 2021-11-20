@@ -1,6 +1,4 @@
-use crate::analytics;
 use crate::database;
-use crate::pt_duration::PTDuration;
 use crate::session::Session;
 use daemonize::Daemonize;
 use dirs::home_dir;
@@ -10,9 +8,7 @@ use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::process::exit;
 use std::thread::sleep;
-// TODO: apparently chrono supports negative durations (or some representation of time); it'd
-// probably be smart to pull out std::time in favor of that to make -s, --subtract easier
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 pub fn init() {
     let working_directory =
@@ -126,9 +122,6 @@ pub fn format_instant_to_hhmmss(time_gained: Duration) -> String {
 
 fn listen_for_durations() {
     let mut session = Session::new();
-    let durations: Vec<Instant> = Vec::new();
-    let mut additions: Vec<Duration> = Vec::new();
-
     let half_second = Duration::from_millis(500);
 
     loop {
@@ -160,9 +153,8 @@ fn listen_for_durations() {
             }
             // TODO: deprecate
             "p" => {
-                // TODO: figure out whether there's a perf gain to & instead
-                let gained_time = report_time_gained(durations.clone(), additions.clone());
-                println!("gained time: {:?}", gained_time);
+                let time_gained = session.analytics.get_time_gained_formatted();
+                println!("gained time: {:?}", time_gained);
             }
             "a" => {
                 let minutes_to_add: u64 = get_misc().unwrap().parse().unwrap();
@@ -176,6 +168,8 @@ fn listen_for_durations() {
         }
 
         session.update_time_gained();
+        // TODO: figure out best strategy for updating time gained: file? -p running every few
+        // seconds? Cf i3bar/zsh and see what feels best
         let time_gained = session.analytics.get_time_gained_formatted();
         set_time_gained(time_gained).expect("Error writing to time-gained file");
         reset_in_file().unwrap();
@@ -218,60 +212,24 @@ pub fn add_minutes(minutes_to_add: String) -> Result<(), Error> {
     Ok(())
 }
 
-fn report_time_gained(durations: Vec<Instant>, additions: Vec<Duration>) -> Duration {
-    get_duration_from_vec_of_tupled_instants(convert_vec_to_vec_of_tuples(durations), additions)
-}
-
 fn reset_in_file() -> Result<(), Error> {
     let in_filepath = get_filepath("in")?;
     write(in_filepath, "").expect("Error writing to tmp in");
     Ok(())
 }
 
-fn zero_out_time_gained_file() -> Result<(), Error> {
-    let time_gained_filepath = get_filepath("time-gained")?;
-    // TODO: consider writing 00:00:00
-    write(time_gained_filepath, "").expect("Error writing to time-gained");
-    Ok(())
-}
+//fn zero_out_time_gained_file() -> Result<(), Error> {
+//    let time_gained_filepath = get_filepath("time-gained")?;
+//    // TODO: consider writing 00:00:00
+//    write(time_gained_filepath, "").expect("Error writing to time-gained");
+//    Ok(())
+//}
 
 // TODO: consolidate session completion fns and figure out a better way to do it
 pub fn trigger_session_completion() -> Result<(), Error> {
     let in_filepath = get_filepath("in")?;
     write(in_filepath, "c").expect("Error writing to /in");
     Ok(())
-}
-
-fn convert_vec_to_vec_of_tuples(untupled_vec: Vec<Instant>) -> Vec<(Instant, Instant)> {
-    if untupled_vec.len() % 2 != 0 {
-        panic!("TODO: attempted to print timer before stopping it");
-    }
-    let mut tupled_vec = Vec::new();
-    for (idx, instant) in untupled_vec.iter().enumerate() {
-        if idx % 2 == 0 {
-            tupled_vec.push((*instant, untupled_vec[idx + 1]));
-        }
-    }
-    tupled_vec
-}
-
-fn get_duration_from_vec_of_tupled_instants(
-    tupled_vec: Vec<(Instant, Instant)>,
-    additions: Vec<Duration>,
-) -> Duration {
-    // mut for .extend()
-    let mut durations_from_tuples: Vec<Duration> = tupled_vec
-        .iter()
-        .map(|tuple| match tuple.1.checked_duration_since(tuple.0) {
-            Some(v) => v,
-            None => {
-                panic!("TODO: something serious would have gone wrong")
-            }
-        })
-        .collect();
-
-    durations_from_tuples.extend(additions);
-    durations_from_tuples.iter().sum()
 }
 
 fn get_filepath(filename: &str) -> Result<String, Error> {
@@ -326,18 +284,4 @@ fn set_time_gained(time_gained: String) -> Result<(), Error> {
     let filepath = get_filepath("time-gained")?;
     write(filepath, time_gained)?;
     Ok(())
-}
-
-fn get_durations_count() -> Result<u32, Error> {
-    let filepath = get_filepath("durations-count")?;
-    Ok(read_to_string(filepath)
-        .expect("Reading from duration count file failed")
-        .parse::<u32>()
-        // TODO: will this actually return an error?
-        .unwrap())
-}
-
-fn get_durations_avg() -> Result<String, Error> {
-    let filepath = get_filepath("durations-average")?;
-    Ok(read_to_string(filepath)?)
 }

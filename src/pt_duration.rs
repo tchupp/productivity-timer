@@ -1,3 +1,6 @@
+// TODO: apparently chrono supports negative durations (or some representation of time); it'd
+// probably be smart to pull out std::time in favor of that to make -s, --subtract easier
+
 use std::time::{Duration, Instant};
 
 // TODO: only private data fields; getters/setters for updating
