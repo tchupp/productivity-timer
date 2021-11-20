@@ -110,8 +110,10 @@ impl Analytics {
         }
     }
 
-    fn update_time_gained(&mut self, durations: &Vec<PTDuration>) {
-        let current_instants: Vec<Duration> = durations
+    fn update_time_gained(&mut self, durations: &Vec<PTDuration>, additions: &Vec<PTDuration>) {
+        //let durations_and_additions = durations.extend(additions);
+
+        let mut durations_time_gained: Vec<Duration> = durations
             .iter()
             .map(|duration| match duration.time_gained {
                 Some(time_gained) => time_gained,
@@ -121,9 +123,17 @@ impl Analytics {
             })
             .collect();
 
-        let time_gained: Duration = current_instants.iter().sum();
+        let additions_time_gained: Vec<Duration> = additions
+            .iter()
+            .map(|duration| match duration.time_gained {
+                Some(time_gained) => time_gained,
+                None => panic!("additions_time_gained failed to fine a time_gained"),
+            })
+            .collect();
 
-        // TODO: handle additions
+        durations_time_gained.extend(additions_time_gained);
+        let time_gained = durations_time_gained.iter().sum();
+
         self.time_gained = Some(time_gained);
     }
 
@@ -141,10 +151,6 @@ impl Analytics {
         };
 
         self.duration_count = Some(duration_count + 1);
-    }
-
-    fn get_duration_count(self) -> u64 {
-        self.duration_count.unwrap()
     }
 
     fn update_duration_avg(&mut self) {
@@ -183,16 +189,13 @@ impl Analytics {
 
         self.duration_avg = Some(format!("{}:{}:{}", avg_hours, avg_minutes, avg_seconds));
     }
-
-    fn get_duration_avg(self) -> String {
-        self.duration_avg.unwrap()
-    }
 }
 
 #[derive(Debug)]
 struct Session {
     id: u64,
     durations: Vec<PTDuration>,
+    additions: Vec<PTDuration>,
     active: bool,
     analytics: Analytics,
 }
@@ -204,14 +207,25 @@ impl Session {
         Session {
             id: 1234, // get id from database saving
             durations: Vec::new(),
+            additions: Vec::new(),
             active: false,
             analytics: Analytics::new(),
         }
     }
 
+    // TODO: DRY up record_time and record_additions
     fn record_time(&mut self, tag: Option<String>) {
         self.durations.push(PTDuration::new(tag));
         self.active = true;
+    }
+
+    fn record_addition(&mut self, minutes_to_add: u64) {
+        // TODO: support tags
+        let mut pt_duration = PTDuration::new(None);
+        let addition = Duration::new(minutes_to_add * 60, 0);
+        pt_duration.update_time_gained(addition);
+
+        self.additions.push(pt_duration);
     }
 
     fn pause(&mut self) {
@@ -229,7 +243,8 @@ impl Session {
 
     fn update_time_gained(&mut self) {
         if self.durations.len() != 0 {
-            self.analytics.update_time_gained(&self.durations);
+            self.analytics
+                .update_time_gained(&self.durations, &self.additions);
         }
     }
 
@@ -301,6 +316,10 @@ impl PTDuration {
         }
     }
 
+    fn update_time_gained(&mut self, time_gained: Duration) {
+        self.time_gained = Some(time_gained);
+    }
+
     fn end(&mut self) {
         self.end = Some(Instant::now());
     }
@@ -308,7 +327,7 @@ impl PTDuration {
 
 fn listen_for_durations() {
     let mut session = Session::new();
-    let mut durations: Vec<Instant> = Vec::new();
+    let durations: Vec<Instant> = Vec::new();
     let mut additions: Vec<Duration> = Vec::new();
 
     let half_second = Duration::from_millis(500);
@@ -321,18 +340,15 @@ fn listen_for_durations() {
             "e" => exit(0),
             // TODO: find a better way to reset durations on session completions
             "c" => {
-                //additions = Vec::new();
-
-                //zero_out_time_gained_file().unwrap();
                 session.save_session();
                 session = Session::new();
             }
             "t" => {
-                //durations.push(Instant::now()),
                 match session.active {
                     // TODO: figure out best way to take in flags for stuff like tags
                     true => session.pause(),
                     false => {
+                        // TODO: DRY/refactor this logic (in -a, too)
                         let tag = get_tag().unwrap();
                         match tag {
                             Some(tag) => {
@@ -351,8 +367,10 @@ fn listen_for_durations() {
             }
             "a" => {
                 let minutes_to_add: u64 = get_misc().unwrap().parse().unwrap();
-                let addition = Duration::new(minutes_to_add * 60, 0);
-                additions.push(addition);
+
+                // TODO: support tags
+                session.record_addition(minutes_to_add);
+
                 reset_misc().unwrap();
             }
             _ => (),
