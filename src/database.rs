@@ -1,6 +1,5 @@
 use dirs::home_dir;
 use rusqlite::{params, Connection, Result};
-use std::convert::TryInto;
 use std::fmt;
 
 // TODO better db name
