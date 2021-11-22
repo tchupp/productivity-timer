@@ -76,12 +76,27 @@ impl Session {
             None => 0.to_string(),
         };
 
-        database::save_time_gained(
+        database::save_session(
             formatted_time_gained,
             self.analytics.duration_count.unwrap().try_into().unwrap(),
             duration_avg,
             self.id,
         )
         .unwrap();
+
+        // TODO: check how I'm handling additions; are they moved and emptied via the append
+        // method? I think they are
+        let mut all_durations = Vec::new();
+        all_durations.extend(&self.durations);
+        all_durations.extend(&self.additions);
+
+        for duration in self.durations {
+            database::save_tag(
+                self.id,
+                duration.tag.unwrap(),
+                format_instant_to_hhmmss(duration.time_gained.unwrap()),
+            )
+            .expect("Error saving tag");
+        }
     }
 }

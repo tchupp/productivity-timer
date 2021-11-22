@@ -54,7 +54,34 @@ pub fn new_session() -> Result<u64> {
 
     Ok(id)
 }
-pub fn save_time_gained(
+
+pub fn save_tag(session_id: u64, tag_value: String, time: String) -> Result<()> {
+    let conn = connect_to_database()?;
+    match conn.execute(
+        "CREATE TABLE IF NOT EXISTS tags (
+            id                          INTEGER PRIMARY KEY,
+            session_id                  INTEGER,
+            value                       TEXT,
+            time                        TEXT
+        )",
+        [],
+    ) {
+        Ok(..) => (),
+        Err(e) => panic!("error creating sessions table: {}", e),
+    };
+
+    match conn.execute(
+        "INSERT INTO tags (session_id, value, time) VALUES (?1, ?2, ?3)",
+        params![session_id, tag_value, time],
+    ) {
+        Ok(..) => (),
+        Err(e) => panic!("error inserting into db: {:?}", e),
+    };
+
+    Ok(())
+}
+
+pub fn save_session(
     time_gained: String,
     durations_count: u32,
     durations_avg: String,
