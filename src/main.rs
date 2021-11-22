@@ -109,6 +109,6 @@ fn main() {
     }
 
     if interface {
-        interface::hello_world().unwrap();
+        interface::draw().unwrap();
     }
 }

@@ -188,6 +188,32 @@ pub fn get_lifetime_overview() -> Result<Vec<LifetimeOverview>> {
     Ok(times)
 }
 
+// TODO: reconsider typing
+#[derive(Debug)]
+struct Tag {
+    value: String,
+    duration: String,
+}
+
+pub fn get_tags_pane() -> Result<String> {
+    let conn = connect_to_database()?;
+
+    let mut stmt =
+        conn.prepare("SELECT value, time(sum(strftime('%s', time) - strftime('%s', '00:00:00')), 'unixepoch') AS time FROM tags WHERE time IS NOT NULL AND value IS NOT NULL GROUP BY VALUE ORDER BY time DESC")?;
+
+    let tags: String = stmt
+        .query_map([], |row| {
+            Ok(Tag {
+                value: row.get(0)?,
+                duration: row.get(1)?,
+            })
+        })?
+        .map(Result::unwrap)
+        .map(|t| format!("{} :: {}\n", t.value, t.duration))
+        .collect::<String>();
+    Ok(tags)
+}
+
 #[derive(Debug)]
 pub struct TotalTimeAsSeconds {
     pub total_time: i32,

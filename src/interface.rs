@@ -11,7 +11,7 @@ use tui::style::{Color, Style};
 use tui::widgets::{BarChart, Block, Borders, Paragraph};
 use tui::Terminal;
 
-pub fn hello_world() -> Result<(), Error> {
+pub fn draw() -> Result<(), Error> {
     let stdout = stdout().into_raw_mode()?;
     // TODO: why do I need the lock?
     let stdin = stdin();
@@ -29,15 +29,17 @@ pub fn hello_world() -> Result<(), Error> {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
-                .constraints([
-                    Constraint::Percentage(10),
-                    Constraint::Percentage(80),
-                    Constraint::Percentage(10),
-                ])
+                .constraints([Constraint::Percentage(10), Constraint::Percentage(80)])
                 .split(f.size());
 
             let overview = database::get_lifetime_overview().unwrap()[0].to_string();
             f.render_widget(draw_overview(overview), chunks[0]);
+
+            let body_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .margin(1)
+                .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+                .split(chunks[1]);
 
             let mut total_times: Vec<(&str, u64)> = vec![];
             let times = database::get_total_time_as_seconds().unwrap();
@@ -47,7 +49,10 @@ pub fn hello_world() -> Result<(), Error> {
             }
 
             let durations_barchart = draw_barchart(&total_times);
-            f.render_widget(durations_barchart, chunks[1]);
+            f.render_widget(durations_barchart, body_chunks[0]);
+
+            let tags = database::get_tags_pane().unwrap();
+            f.render_widget(draw_tags(tags), body_chunks[1]);
         })?;
 
         let b = bytes.next().unwrap().unwrap();
@@ -69,6 +74,18 @@ fn draw_overview<'a>(overview: String) -> Paragraph<'a> {
         .block(
             Block::default()
                 .title("Overview")
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::White)),
+        )
+}
+
+fn draw_tags<'a>(tags: String) -> Paragraph<'a> {
+    Paragraph::new(tags)
+        .style(Style::default().fg(Color::LightCyan))
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .title("Tags")
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White)),
         )
