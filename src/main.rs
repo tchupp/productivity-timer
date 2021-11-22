@@ -50,6 +50,14 @@ fn main() {
                 .long("complete")
                 .help("Completes a session of recording quality time.")
         )
+        .arg(
+            // TODO: remove kebob-case
+            Arg::with_name("tag-time")
+                .short("g")
+                .long("tag-time")
+                .takes_value(true)
+                .help("Get time gained for a tag.")
+        )
         .get_matches();
 
     let triggering = matches.is_present("trigger");
@@ -58,6 +66,7 @@ fn main() {
     let interface = matches.is_present("interface");
     let adding_minutes = matches.is_present("add");
     let completing_session = matches.is_present("complete");
+    let tag_time = matches.is_present("tag-time");
 
     if completing_session {
         daemon::trigger_session_completion().unwrap();
@@ -87,6 +96,12 @@ fn main() {
                 daemon::trigger_time(None).unwrap();
             }
         }
+    }
+
+    if tag_time {
+        let tag = matches.value_of("tag-time").unwrap().to_string();
+        let tag_time = database::get_tag_time(&tag).unwrap();
+        println!("{}: {}", tag, tag_time);
     }
 
     if daemonizing {

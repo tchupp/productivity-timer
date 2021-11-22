@@ -81,6 +81,20 @@ pub fn save_tag(session_id: u64, tag_value: String, time: String) -> Result<()> 
     Ok(())
 }
 
+pub fn get_tag_time(tag_value: &String) -> Result<u32> {
+    let conn = connect_to_database()?;
+
+    let mut stmt = conn.prepare("SELECT sum(strftime('%s', time) - strftime('%s', '00:00:00')) FROM tags WHERE value = :tag_value")?;
+    let mut rows = stmt.query(&[(":tag_value", tag_value)])?;
+    let mut time: Option<u32> = None;
+
+    while let Some(row) = rows.next()? {
+        time = row.get(0)?;
+    }
+
+    Ok(time.unwrap())
+}
+
 pub fn save_session(
     time_gained: String,
     durations_count: u32,
