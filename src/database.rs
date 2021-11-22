@@ -202,7 +202,7 @@ pub fn get_total_time_as_seconds() -> Result<Vec<TotalTimeAsSeconds>> {
     // TODO: interpolate the database name to make it dynamic
     // Use sqlite3's datetime fns to get total seconds
     let mut stmt = conn
-        .prepare("SELECT strftime('%s', total_time) - strftime('%s', '00:00:00') FROM sessions")?;
+        .prepare("SELECT strftime('%s', total_time) - strftime('%s', '00:00:00') FROM sessions WHERE total_time IS NOT NULL")?;
 
     let total_times: Vec<TotalTimeAsSeconds> = stmt
         .query_map([], |row| {
