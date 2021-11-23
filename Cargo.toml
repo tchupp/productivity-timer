@@ -7,8 +7,11 @@ edition = "2018"
 [dependencies]
 clap = "2.33.3"
 daemonize = "0.4.1"
-rusqlite = "0.25"
 dirs = "4.0.0"
 tui = "0.16"
 termion = "1.5"
 regex = "1.5.4"
+
+[dependencies.rusqlite]
+version = "0.26.0"
+features = ["bundled"]
