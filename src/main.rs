@@ -81,6 +81,7 @@ fn main() {
         println!("{:?}", time_gained);
     }
 
+    // TODO: support tags
     if adding_minutes {
         // handle regex in supporting fn
         let minutes_to_add = matches.value_of("add").unwrap().to_string();
@@ -100,8 +101,9 @@ fn main() {
 
     if tag_time {
         let tag = matches.value_of("tag-time").unwrap().to_string();
-        let tag_time = database::get_tag_time(&tag).unwrap();
-        println!("{}: {}", tag, tag_time);
+        daemon::print_tags(tag);
+        //let tag_time = database::get_tag_time(&tag).unwrap();
+        //println!("{}: {}", tag, tag_time);
     }
 
     if daemonizing {

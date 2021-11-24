@@ -4,6 +4,8 @@ use crate::database;
 use crate::pt_duration::PTDuration;
 use core::time::Duration;
 use std::convert::TryInto;
+use std::io::Error;
+use std::time::Instant;
 
 // TODO: only private data fields, add getters/setters
 #[derive(Debug)]
@@ -98,5 +100,26 @@ impl Session {
             )
             .expect("Error saving tag");
         }
+    }
+
+    pub fn get_tag_time_gained(&self, tag: String) -> Result<String, Error> {
+        let time_gained_for_tag: Duration = self
+            .durations
+            .iter()
+            .map(|duration| {
+                if duration.tag.as_ref().unwrap().to_string() == tag {
+                    match duration.time_gained {
+                        Some(time_gained) => time_gained,
+                        None => Instant::now()
+                            .checked_duration_since(duration.begin)
+                            .unwrap(),
+                    }
+                } else {
+                    Duration::new(0, 0)
+                }
+            })
+            .sum();
+
+        Ok(format_instant_to_hhmmss(time_gained_for_tag))
     }
 }

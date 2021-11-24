@@ -58,10 +58,16 @@ fn listen_for_durations() {
                     }
                 }
             }
-            // TODO: deprecate
+            // TODO: deprecate, doublecheck unused
             "p" => {
                 let time_gained = session.analytics.get_time_gained_formatted();
                 println!("gained time: {:?}", time_gained);
+            }
+            "g" => {
+                let tag = get_tag().unwrap().unwrap();
+                let time_gained = session.get_tag_time_gained(tag);
+                println!("{:?}", time_gained);
+                reset_tag().unwrap();
             }
             "a" => {
                 let minutes_to_add: u64 = get_misc().unwrap().parse().unwrap();
@@ -144,6 +150,7 @@ fn read_from_in_file() -> Result<String, Error> {
     read_to_string(&in_filepath)
 }
 
+// TODO: move to a utils mod
 pub fn format_instant_to_hhmmss(time_gained: Duration) -> String {
     let seconds_raw = time_gained.as_secs() % 60;
     let minutes_raw = (time_gained.as_secs() / 60) % 60;
@@ -181,6 +188,13 @@ fn reset_misc() -> Result<(), Error> {
     Ok(())
 }
 
+// TODO dry up all these reset fns
+fn reset_tag() -> Result<(), Error> {
+    let tag_filepath = get_filepath("tag")?;
+    write(tag_filepath, "").expect("Problem writing to tag file");
+    Ok(())
+}
+
 fn get_misc() -> Result<String, Error> {
     let misc_filepath = get_filepath("misc")?;
     Ok(read_to_string(&misc_filepath)?)
@@ -207,6 +221,14 @@ pub fn add_minutes(minutes_to_add: String) -> Result<(), Error> {
 
     write(in_filepath, "a").expect("Error writing to time gained file");
     write(misc_filepath, minutes_to_add).expect("Error writing to misc file");
+    Ok(())
+}
+
+pub fn print_tags(tag: String) -> Result<(), Error> {
+    let in_filepath = get_filepath("in")?;
+    let tag_filepath = get_filepath("tag")?;
+    write(in_filepath, "g").expect("Error writing to in file");
+    write(tag_filepath, tag).expect("Error writing to tag file");
     Ok(())
 }
 
