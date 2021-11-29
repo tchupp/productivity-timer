@@ -16,6 +16,7 @@ pub struct Session {
     additions: Vec<PTDuration>,
     pub active: bool,
     pub analytics: Analytics,
+    pub tag: Option<String>,
 }
 
 impl Session {
@@ -29,6 +30,7 @@ impl Session {
             additions: Vec::new(),
             active: false,
             analytics: Analytics::new(),
+            tag: None,
         }
     }
 
@@ -83,6 +85,7 @@ impl Session {
             self.analytics.duration_count.unwrap().try_into().unwrap(),
             duration_avg,
             self.id,
+            self.tag.unwrap(),
         )
         .unwrap();
 

@@ -11,7 +11,7 @@ use tui::style::{Color, Style};
 use tui::widgets::{BarChart, Block, Borders, Paragraph};
 use tui::Terminal;
 
-pub fn draw() -> Result<(), Error> {
+pub fn draw(session_tag: String) -> Result<(), Error> {
     let stdout = stdout().into_raw_mode()?;
     // TODO: why do I need the lock?
     let stdin = stdin();
@@ -32,7 +32,7 @@ pub fn draw() -> Result<(), Error> {
                 .constraints([Constraint::Percentage(10), Constraint::Percentage(80)])
                 .split(f.size());
 
-            let overview = database::get_lifetime_overview().unwrap()[0].to_string();
+            let overview = database::get_lifetime_overview(&session_tag).unwrap()[0].to_string();
             f.render_widget(draw_overview(overview), chunks[0]);
 
             let body_chunks = Layout::default()
@@ -42,7 +42,7 @@ pub fn draw() -> Result<(), Error> {
                 .split(chunks[1]);
 
             let mut total_times: Vec<(&str, u64)> = vec![];
-            let times = database::get_total_time_as_seconds().unwrap();
+            let times = database::get_total_time_as_seconds(&session_tag).unwrap();
 
             for time in times {
                 total_times.push(("", time.total_time.try_into().unwrap()));
@@ -51,7 +51,7 @@ pub fn draw() -> Result<(), Error> {
             let durations_barchart = draw_barchart(&total_times);
             f.render_widget(durations_barchart, body_chunks[0]);
 
-            let tags = database::get_tags_pane().unwrap();
+            let tags = database::get_tags_pane(&session_tag).unwrap();
             f.render_widget(draw_tags(tags), body_chunks[1]);
         })?;
 

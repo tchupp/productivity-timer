@@ -28,7 +28,8 @@ pub fn new_session() -> Result<u64> {
             id                          INTEGER PRIMARY KEY,
             total_time                  TEXT,
             durations_count             INTEGER,
-            durations_avg               TEXT
+            durations_avg               TEXT,
+            tag                         TEXT
         )",
         [],
     ) {
@@ -99,11 +100,12 @@ pub fn save_session(
     durations_count: u32,
     durations_avg: String,
     session_id: u64,
+    tag: String,
 ) -> Result<()> {
     let conn = connect_to_database()?;
     match conn.execute(
-        "UPDATE sessions SET (total_time, durations_count, durations_avg) = (?1, ?2, ?3) WHERE id = ?4",
-        params![time_gained, durations_count, durations_avg, session_id],
+        "UPDATE sessions SET (total_time, durations_count, durations_avg, tag) = (?1, ?2, ?3, ?4) WHERE id = ?5",
+        params![time_gained, durations_count, durations_avg, tag, session_id],
     ) {
         Ok(..) => (),
         Err(e) =>panic!("error inserting into db: {:?}", e)
@@ -164,7 +166,7 @@ impl fmt::Display for LifetimeOverview {
     }
 }
 
-pub fn get_lifetime_overview() -> Result<Vec<LifetimeOverview>> {
+pub fn get_lifetime_overview(session_tag: &String) -> Result<Vec<LifetimeOverview>> {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
     let database = working_directory + "/" + &DATABASE_NAME.to_string();
@@ -173,10 +175,10 @@ pub fn get_lifetime_overview() -> Result<Vec<LifetimeOverview>> {
     // TODO: interpolate the database name to make it dynamic
     // Use sqlite3's datetime fns to get total seconds
     let mut stmt =
-        conn.prepare("SELECT time(sum(strftime('%s', total_time) - strftime('%s', '00:00:00')) / count(total_time), 'unixepoch'), time(sum(strftime('%s', durations_avg) - strftime('%s', '00:00:00')) / count(durations_avg), 'unixepoch') FROM sessions")?;
+        conn.prepare("SELECT time(sum(strftime('%s', total_time) - strftime('%s', '00:00:00')) / count(total_time), 'unixepoch'), time(sum(strftime('%s', durations_avg) - strftime('%s', '00:00:00')) / count(durations_avg), 'unixepoch') FROM sessions WHERE tag = :tag")?;
 
     let times: Vec<LifetimeOverview> = stmt
-        .query_map([], |row| {
+        .query_map(&[(":tag", &session_tag)], |row| {
             Ok(LifetimeOverview {
                 lifetime_total_time_avg: row.get(0)?,
                 lifetime_durations_avg: row.get(1)?,
@@ -195,14 +197,20 @@ struct Tag {
     duration: String,
 }
 
-pub fn get_tags_pane() -> Result<String> {
+pub fn get_tags_pane(session_tag: &String) -> Result<String> {
     let conn = connect_to_database()?;
 
+    // left off here
+    // this needs to be a join of some kind; we need to select tag from sessions, not
+    // from tags
+    //
+    // select * from sessions where tag = :tag, some kind of join on tags, selecting
+    // all from tags
     let mut stmt =
-        conn.prepare("SELECT value, time(sum(strftime('%s', time) - strftime('%s', '00:00:00')), 'unixepoch') AS time FROM tags WHERE time IS NOT NULL AND value IS NOT NULL GROUP BY VALUE ORDER BY time DESC")?;
+        conn.prepare("SELECT value, time(sum(strftime('%s', time) - strftime('%s', '00:00:00')), 'unixepoch') AS time FROM tags t JOIN sessions s ON s.id = t.session_id WHERE s.tag = :tag AND t.time IS NOT NULL AND t.value IS NOT NULL GROUP BY VALUE ORDER BY t.time DESC")?;
 
     let tags: String = stmt
-        .query_map([], |row| {
+        .query_map(&[(":tag", &session_tag)], |row| {
             Ok(Tag {
                 value: row.get(0)?,
                 duration: row.get(1)?,
@@ -219,7 +227,7 @@ pub struct TotalTimeAsSeconds {
     pub total_time: i32,
 }
 
-pub fn get_total_time_as_seconds() -> Result<Vec<TotalTimeAsSeconds>> {
+pub fn get_total_time_as_seconds(session_tag: &String) -> Result<Vec<TotalTimeAsSeconds>> {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
     let database = working_directory + "/" + &DATABASE_NAME.to_string();
@@ -228,10 +236,11 @@ pub fn get_total_time_as_seconds() -> Result<Vec<TotalTimeAsSeconds>> {
     // TODO: interpolate the database name to make it dynamic
     // Use sqlite3's datetime fns to get total seconds
     let mut stmt = conn
-        .prepare("SELECT strftime('%s', total_time) - strftime('%s', '00:00:00') FROM sessions WHERE total_time IS NOT NULL")?;
+        .prepare("SELECT strftime('%s', total_time) - strftime('%s', '00:00:00') FROM sessions WHERE total_time IS NOT NULL AND tag = :tag")?;
 
+    //let mut rows = stmt.query(&[(":tag_value", tag_value)])?;
     let total_times: Vec<TotalTimeAsSeconds> = stmt
-        .query_map([], |row| {
+        .query_map(&[(":tag", &session_tag)], |row| {
             Ok(TotalTimeAsSeconds {
                 total_time: row.get(0)?,
             })

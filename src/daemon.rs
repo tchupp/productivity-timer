@@ -39,8 +39,11 @@ fn listen_for_durations() {
         match input.trim() {
             "e" => exit(0),
             "c" => {
+                let tag = get_tag().unwrap();
+                session.tag = tag;
                 session.save_session();
                 session = Session::new();
+                reset_tag().unwrap();
             }
             "t" => {
                 match session.active {
@@ -57,6 +60,7 @@ fn listen_for_durations() {
                         }
                     }
                 }
+                reset_tag().unwrap();
             }
             // TODO: deprecate, doublecheck unused
             "p" => {
@@ -239,9 +243,12 @@ fn reset_in_file() -> Result<(), Error> {
 }
 
 // TODO: consolidate session completion fns and figure out a better way to do it
-pub fn trigger_session_completion() -> Result<(), Error> {
+pub fn trigger_session_completion(tag: String) -> Result<(), Error> {
     let in_filepath = get_filepath("in")?;
+    let tag_filepath = get_filepath("tag")?;
+
     write(in_filepath, "c").expect("Error writing to /in");
+    write(tag_filepath, tag).expect("Error writing to tag file");
     Ok(())
 }
 

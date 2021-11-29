@@ -35,6 +35,7 @@ fn main() {
             Arg::with_name("interface")
                 .short("i")
                 .long("interface")
+                .takes_value(true)
                 .help("Opens a terminal interface.")
         )
         .arg(
@@ -48,6 +49,7 @@ fn main() {
             Arg::with_name("complete")
                 .short("c")
                 .long("complete")
+                .takes_value(true)
                 .help("Completes a session of recording quality time.")
         )
         .arg(
@@ -69,7 +71,8 @@ fn main() {
     let tag_time = matches.is_present("tag-time");
 
     if completing_session {
-        daemon::trigger_session_completion().unwrap();
+        let tag = matches.value_of("complete").unwrap().to_string();
+        daemon::trigger_session_completion(tag).unwrap();
         let times = database::get_times();
         for time in times {
             println!("gained time: {:?}", time);
@@ -111,6 +114,7 @@ fn main() {
     }
 
     if interface {
-        interface::draw().unwrap();
+        let tag = matches.value_of("interface").unwrap().to_string();
+        interface::draw(tag).unwrap();
     }
 }
