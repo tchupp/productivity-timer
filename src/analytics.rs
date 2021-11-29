@@ -21,9 +21,12 @@ impl Analytics {
         }
     }
 
-    pub fn update_time_gained(&mut self, durations: &Vec<PTDuration>, additions: &Vec<PTDuration>) {
-        //let durations_and_additions = durations.extend(additions);
-
+    pub fn update_time_gained(
+        &mut self,
+        durations: &Vec<PTDuration>,
+        additions: &Vec<PTDuration>,
+        subtractions: &Vec<PTDuration>,
+    ) {
         let mut durations_time_gained: Vec<Duration> = durations
             .iter()
             .map(|duration| match duration.time_gained {
@@ -38,12 +41,24 @@ impl Analytics {
             .iter()
             .map(|duration| match duration.time_gained {
                 Some(time_gained) => time_gained,
-                None => panic!("additions_time_gained failed to fine a time_gained"),
+                None => panic!("additions.time_gained failed to find a time_gained"),
             })
             .collect();
 
+        // what happens if no subtractions or additions? empty array?
+        let subtractions_time_gained: Vec<Duration> = subtractions
+            .iter()
+            .map(|duration| match duration.time_gained {
+                Some(time_gained) => time_gained,
+                None => panic!("subtractions.time_gained failed to find a time_gained"),
+            })
+            .collect();
+
+        let subtractions = subtractions_time_gained.iter().sum();
+
         durations_time_gained.extend(additions_time_gained);
-        let time_gained = durations_time_gained.iter().sum();
+        let time_gained: Duration = durations_time_gained.iter().sum();
+        let time_gained = time_gained.checked_sub(subtractions).unwrap();
 
         self.time_gained = Some(time_gained);
     }

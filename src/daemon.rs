@@ -81,6 +81,14 @@ fn listen_for_durations() {
 
                 reset_misc().unwrap();
             }
+            "s" => {
+                let minutes_to_subtract: u64 = get_misc().unwrap().parse().unwrap();
+
+                // TODO: support tags
+                session.record_subtraction(minutes_to_subtract);
+
+                reset_misc().unwrap();
+            }
             _ => (),
         }
 
@@ -225,6 +233,20 @@ pub fn add_minutes(minutes_to_add: String) -> Result<(), Error> {
 
     write(in_filepath, "a").expect("Error writing to time gained file");
     write(misc_filepath, minutes_to_add).expect("Error writing to misc file");
+    Ok(())
+}
+
+pub fn subtract_minutes(minutes_to_subtract: String) -> Result<(), Error> {
+    let in_filepath = get_filepath("in")?;
+    let misc_filepath = get_filepath("misc")?;
+
+    let re = Regex::new(r"^\d+$").unwrap();
+    assert!(re.is_match("15"));
+    // TODO: better error message/handling if failed regex
+    assert!(re.is_match(&minutes_to_subtract));
+
+    write(in_filepath, "s").expect("Error writing to in_file");
+    write(misc_filepath, minutes_to_subtract).expect("Error writing to misc file");
     Ok(())
 }
 

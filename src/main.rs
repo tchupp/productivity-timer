@@ -46,6 +46,13 @@ fn main() {
                 .help("Add an arbitrary number of minutes to count as one duration for time gained. Example: pt -a 10, which adds 10 minutes to your time gained.")
         )
         .arg(
+            Arg::with_name("subtract")
+                .short("s")
+                .long("subtract")
+                .takes_value(true)
+                .help("Subtract an arbitrary number of minutes, counting as one duration, from a session. Example: pt -s 10, which subtracts 10 minutes from your session.")
+        )
+        .arg(
             Arg::with_name("complete")
                 .short("c")
                 .long("complete")
@@ -67,6 +74,7 @@ fn main() {
     let printing = matches.is_present("print");
     let interface = matches.is_present("interface");
     let adding_minutes = matches.is_present("add");
+    let subtracting_minutes = matches.is_present("subtract");
     let completing_session = matches.is_present("complete");
     let tag_time = matches.is_present("tag-time");
 
@@ -89,6 +97,12 @@ fn main() {
         // handle regex in supporting fn
         let minutes_to_add = matches.value_of("add").unwrap().to_string();
         daemon::add_minutes(minutes_to_add).unwrap();
+    }
+
+    if subtracting_minutes {
+        // handle regex in supporting fn
+        let minutes_to_subtract = matches.value_of("subtract").unwrap().to_string();
+        daemon::subtract_minutes(minutes_to_subtract).unwrap();
     }
 
     if triggering {

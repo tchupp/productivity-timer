@@ -14,6 +14,7 @@ pub struct Session {
     pub id: u64,
     durations: Vec<PTDuration>,
     additions: Vec<PTDuration>,
+    subtractions: Vec<PTDuration>,
     pub active: bool,
     pub analytics: Analytics,
     pub tag: Option<String>,
@@ -28,6 +29,7 @@ impl Session {
             id,
             durations: Vec::new(),
             additions: Vec::new(),
+            subtractions: Vec::new(),
             active: false,
             analytics: Analytics::new(),
             tag: None,
@@ -49,6 +51,15 @@ impl Session {
         self.additions.push(pt_duration);
     }
 
+    pub fn record_subtraction(&mut self, minutes_to_subtract: u64) {
+        // TODO: support tags
+        let mut pt_duration = PTDuration::new(None);
+        let subtraction = Duration::new(minutes_to_subtract * 60, 0);
+        pt_duration.update_time_gained(subtraction);
+
+        self.subtractions.push(pt_duration);
+    }
+
     pub fn pause(&mut self) {
         let active_duration = self.durations.last_mut().unwrap();
         active_duration.end();
@@ -65,11 +76,12 @@ impl Session {
     pub fn update_time_gained(&mut self) {
         if self.durations.len() != 0 {
             self.analytics
-                .update_time_gained(&self.durations, &self.additions);
+                .update_time_gained(&self.durations, &self.additions, &self.subtractions);
         }
     }
 
     pub fn save_session(self) {
+        // This includes additions and subtractions via analytics
         let formatted_time_gained = match self.analytics.time_gained {
             Some(v) => format_instant_to_hhmmss(v),
             None => "00:00:00".to_string(),
@@ -89,12 +101,9 @@ impl Session {
         )
         .unwrap();
 
-        // TODO: check how I'm handling additions; are they moved and emptied via the append
-        // method? I think they are
-        let mut all_durations = Vec::new();
-        all_durations.extend(&self.durations);
-        all_durations.extend(&self.additions);
-
+        // TODO: this only accounts for 'natural' durations, not additions or subtractions, but it
+        // makes sense to take tags for, them, too. Expand this to cover them, which will require
+        // supporting tags for adds/subs
         for duration in self.durations {
             database::save_tag(
                 self.id,
