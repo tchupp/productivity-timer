@@ -11,6 +11,11 @@ dirs = "4.0.0"
 tui = "0.16"
 termion = "1.5"
 regex = "1.5.4"
+reqwest = { version = "0.11.7", features = [ "json" ]}
+tokio = { version = "1.14.0", features = [ "rt-multi-thread", "macros" ]}
+oauth2 = "4.1.0"
+dotenv = "0.15.0"
+serde = "1.0.130"
 
 [dependencies.rusqlite]
 version = "0.26.0"
