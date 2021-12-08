@@ -4,6 +4,7 @@ mod analytics;
 mod daemon;
 mod database;
 mod interface;
+mod oauth;
 mod pt_duration;
 mod session;
 
@@ -67,6 +68,13 @@ fn main() {
                 .takes_value(true)
                 .help("Get time gained for a tag.")
         )
+        .arg(
+            // TODO: remove kebob-case
+            Arg::with_name("backup")
+                .short("b")
+                .long("backup")
+                .help("Back up database.")
+        )
         .get_matches();
 
     let triggering = matches.is_present("trigger");
@@ -77,6 +85,7 @@ fn main() {
     let subtracting_minutes = matches.is_present("subtract");
     let completing_session = matches.is_present("complete");
     let tag_time = matches.is_present("tag-time");
+    let backing_up = matches.is_present("backup");
 
     if completing_session {
         let tag = matches.value_of("complete").unwrap().to_string();
@@ -130,5 +139,9 @@ fn main() {
     if interface {
         let tag = matches.value_of("interface").unwrap().to_string();
         interface::draw(tag).unwrap();
+    }
+
+    if backing_up {
+        database::backup();
     }
 }
