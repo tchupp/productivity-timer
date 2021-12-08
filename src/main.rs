@@ -69,11 +69,16 @@ fn main() {
                 .help("Get time gained for a tag.")
         )
         .arg(
-            // TODO: remove kebob-case
             Arg::with_name("backup")
                 .short("b")
                 .long("backup")
-                .help("Back up database.")
+                .help("Back up database to Google Drive. Requires a `.env` with API_KEY, GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET.")
+        )
+        .arg(
+            Arg::with_name("sync")
+                .short("y")
+                .long("sync")
+                .help("Syncs local database to what's been backed up in Google Drive. Requires a `.env` with API_KEY, GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET.")
         )
         .get_matches();
 
@@ -86,6 +91,7 @@ fn main() {
     let completing_session = matches.is_present("complete");
     let tag_time = matches.is_present("tag-time");
     let backing_up = matches.is_present("backup");
+    let syncing = matches.is_present("sync");
 
     if completing_session {
         let tag = matches.value_of("complete").unwrap().to_string();
@@ -127,7 +133,7 @@ fn main() {
 
     if tag_time {
         let tag = matches.value_of("tag-time").unwrap().to_string();
-        daemon::print_tags(tag);
+        daemon::print_tags(tag).unwrap();
         //let tag_time = database::get_tag_time(&tag).unwrap();
         //println!("{}: {}", tag, tag_time);
     }
@@ -142,6 +148,11 @@ fn main() {
     }
 
     if backing_up {
-        database::backup();
+        database::backup().unwrap();
+    }
+
+    if syncing {
+        // TODO add a prompt for user confirmation--this will wipe the local db
+        database::sync_local_to_remote().unwrap();
     }
 }

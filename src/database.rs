@@ -6,7 +6,7 @@ use reqwest::header::{ACCEPT, CONTENT_TYPE};
 use rusqlite::{params, Connection, Result};
 use serde::Deserialize;
 use std::fmt;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 
 // TODO better db name
 const DATABASE_NAME: &str = "time_gained";
@@ -312,6 +312,60 @@ pub fn backup() -> Result<(), reqwest::Error> {
         .bearer_auth(token)
         .body(local_database_file)
         .send();
+
+    println!("result: {:?}", result);
+
+    Ok(())
+}
+
+pub fn sync_local_to_remote() -> Result<(), reqwest::Error> {
+    // TODO figure out how to move this to its own fn or the top of the file, not per fn
+    dotenv::dotenv().ok();
+    let api_key = dotenv::var("API_KEY").unwrap();
+    let token = get_token();
+
+    let client = reqwest::blocking::Client::new();
+
+    // TODO better error handling--need to figure out uniform error handling across app
+    let drive_database_file_id = &client
+        .get(DRIVE_FILE_URL.to_string() + "?key=" + &api_key)
+        // TODO figure out if I actually need this content-type
+        .header(ACCEPT, "application/json")
+        .bearer_auth(&token)
+        .send()?
+        .json::<FilesResponse>()
+        .unwrap()
+        .files[0]
+        .id;
+
+    // left off here
+    // un-wippify file creation and where it saves
+    // also, make a mechanism for saving the last 2-3 dbs so we don't totally fuck ourselves
+
+    let database_filepath = home_dir().unwrap().as_path().display().to_string()
+        + "/.productivity-timer"
+        + "/test-db-backup";
+
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(database_filepath)
+        .unwrap();
+
+    let result = &client
+        .get(
+            DRIVE_FILE_URL.to_string()
+                + "/"
+                + drive_database_file_id
+                + "?key="
+                + &api_key
+                + "&alt=media",
+        )
+        .header(ACCEPT, "application/json")
+        .bearer_auth(token)
+        .send()?
+        .copy_to(&mut file);
 
     println!("result: {:?}", result);
 
