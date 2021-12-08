@@ -1,9 +1,18 @@
+use crate::oauth::get_token;
 use dirs::home_dir;
+use dotenv;
+use reqwest;
+use reqwest::header::{ACCEPT, CONTENT_TYPE};
 use rusqlite::{params, Connection, Result};
+use serde::Deserialize;
 use std::fmt;
+use std::fs::File;
 
 // TODO better db name
 const DATABASE_NAME: &str = "time_gained";
+const DRIVE_FILE_URL: &str = "https://www.googleapis.com/drive/v3/files";
+// NB the trailing "/"
+const DRIVE_FILE_UPLOAD_URL: &str = "https://www.googleapis.com/upload/drive/v3/files/";
 
 fn database_filename() -> String {
     let working_directory =
@@ -200,12 +209,6 @@ struct Tag {
 pub fn get_tags_pane(session_tag: &String) -> Result<String> {
     let conn = connect_to_database()?;
 
-    // left off here
-    // this needs to be a join of some kind; we need to select tag from sessions, not
-    // from tags
-    //
-    // select * from sessions where tag = :tag, some kind of join on tags, selecting
-    // all from tags
     let mut stmt =
         conn.prepare("SELECT value, time(sum(strftime('%s', time) - strftime('%s', '00:00:00')), 'unixepoch') AS time FROM tags t JOIN sessions s ON s.id = t.session_id WHERE s.tag = :tag AND t.time IS NOT NULL AND t.value IS NOT NULL GROUP BY VALUE ORDER BY t.time DESC")?;
 
@@ -249,4 +252,68 @@ pub fn get_total_time_as_seconds(session_tag: &String) -> Result<Vec<TotalTimeAs
         .collect();
 
     Ok(total_times)
+}
+
+#[derive(Deserialize, Debug)]
+struct DriveFile {
+    kind: String,
+    id: String,
+    name: String,
+    // TODO: not picking up?
+    #[allow(non_camel_case_types)]
+    mimeType: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct FilesResponse {
+    kind: String,
+    // TODO: not picking up?
+    #[allow(non_camel_case_types)]
+    incompleteSearch: bool,
+    files: Vec<DriveFile>,
+}
+
+pub fn backup() -> Result<(), reqwest::Error> {
+    dotenv::dotenv().ok();
+    let api_key = dotenv::var("API_KEY").unwrap();
+    let token = get_token();
+
+    let client = reqwest::blocking::Client::new();
+
+    // TODO better error handling--need to figure out uniform error handling across app
+    let drive_database_file_id = &client
+        .get(DRIVE_FILE_URL.to_string() + "?key=" + &api_key)
+        // TODO figure out if I actually need this content-type
+        .header(ACCEPT, "application/json")
+        .bearer_auth(&token)
+        .send()?
+        .json::<FilesResponse>()
+        .unwrap()
+        .files[0]
+        // NB also has mimetype
+        .id;
+
+    let database_filename = database_filename();
+    let local_database_file = File::open(database_filename).unwrap();
+
+    let result = &client
+        // NB uploadType=media is good up to 5mb, which is ~416x the size of my current sqlite db;
+        // we'll worry about multipart uploads whenever we actually have to worry about them, but
+        // reqwest has an api for it
+        .patch(
+            DRIVE_FILE_UPLOAD_URL.to_string()
+                + drive_database_file_id
+                + "?key="
+                + &api_key
+                + "&uploadType=media",
+        )
+        .header(ACCEPT, "application/json")
+        .header(CONTENT_TYPE, "application/x-sqlite3")
+        .bearer_auth(token)
+        .body(local_database_file)
+        .send();
+
+    println!("result: {:?}", result);
+
+    Ok(())
 }
