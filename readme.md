@@ -85,6 +85,7 @@ I haven't implemented refresh flow for tokens, so you'll have to comment out the
 
 ```
 pt -b
+```
 
 #### Sync
 
