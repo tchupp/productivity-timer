@@ -67,6 +67,8 @@ Replace "work" with whatever session tag you want. Session tags are how you buck
 pt -t "work"
 ```
 
+This will open an interface in your terminal. See the example below.
+
 ### Backup/syncing
 
 You can back your database up to Google Drive. You need to set up your own application in GCP's console, giving the barest possible scopes to Google Drive API. Your redirect URL will need to be `http://localhost:8080`. You'll then need a `.env` file with your client ID, secret, and API key:
@@ -97,6 +99,7 @@ You'll then need to manually `mv` the database to replace `~/.productivity-timer
 
 ###
 
-# TUI
+# Terminal interface
+
 
 <img width="1473" alt="Screen Shot 2021-12-10 at 8 04 22 AM" src="https://user-images.githubusercontent.com/26738844/145578475-8f2d9e52-e288-4e6f-be3d-642a0f5a0d95.png">
