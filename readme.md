@@ -51,6 +51,7 @@ Clone this repo, navigate to it, and then run `cargo install --path .`. The `pt`
 
 # Examples
 
+
 ### Begin a duration
 
 ```
@@ -62,6 +63,31 @@ pt -t "prayer"
 ```
 pt -t "prayer"
 ```
+
+### Seeing your current duration
+
+```
+pt -p
+```
+
+You can plug this into your shell, i3, or wherever. Here's what I have in my .zshrc:
+
+```
+# allows for fns in prompt
+setopt PROMPT_SUBST
+print_time_gained(){ pt -p | tr -d '"'}
+PROMPT='%{%f%b%k%}%K{red}$(print_time_gained)%k$(build_prompt)'
+
+# https://www.zsh.org/mla/users/2007/msg00944.html
+TMOUT=3
+TRAPALRM() {
+    zle reset-prompt
+}
+```
+
+Which spits out:
+
+<img width="130" alt="Screen Shot 2021-12-10 at 8 58 15 AM" src="https://user-images.githubusercontent.com/26738844/145585285-ead429d0-c8c8-45f0-ae65-78c6c232c0b8.png">
 
 ### Report on time gained
 
