@@ -45,6 +45,10 @@ The daemon doesn't (yet) start automatically. So, use `pt -d` whenever you reboo
 
 **This is early alpha; it saves an OAuth token in `~/.productivity-timer/token`**. Don't hook it up to anything you care about, and don't care about anything you shouldn't care about.
 
+# Installation
+
+Clone this repo, navigate to it, and then run `cargo install --path .`. The `pt` command should then be available. Test with `pt -h`.
+
 # Examples
 
 ### Begin a duration
@@ -100,6 +104,5 @@ You'll then need to manually `mv` the database to replace `~/.productivity-timer
 ###
 
 # Terminal interface
-
 
 <img width="1473" alt="Screen Shot 2021-12-10 at 8 04 22 AM" src="https://user-images.githubusercontent.com/26738844/145578475-8f2d9e52-e288-4e6f-be3d-642a0f5a0d95.png">
