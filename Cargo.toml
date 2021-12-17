@@ -1,6 +1,6 @@
 [package]
 name = "pt"
-author = "Aaron Arinder <aaronarinder@protonmail.com>"
+authors = ["Aaron Arinder <aaronarinder@protonmail.com>"]
 version = "0.2.1"
 edition = "2018"
 

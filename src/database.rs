@@ -1,7 +1,5 @@
 use crate::oauth::get_token;
 use dirs::home_dir;
-use dotenv;
-use reqwest;
 use reqwest::header::{ACCEPT, CONTENT_TYPE};
 use rusqlite::{params, Connection, Result};
 use serde::Deserialize;
@@ -17,8 +15,8 @@ const DRIVE_FILE_UPLOAD_URL: &str = "https://www.googleapis.com/upload/drive/v3/
 fn database_filename() -> String {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
-    let filename = working_directory + "/" + &DATABASE_NAME.to_string();
-    filename
+
+    format!("{}/{}", working_directory, DATABASE_NAME)
 }
 
 fn connect_to_database() -> Result<Connection, rusqlite::Error> {
@@ -90,7 +88,8 @@ pub fn save_tag(session_id: u64, tag_value: String, time: String) -> Result<()> 
     Ok(())
 }
 
-pub fn get_tag_time(tag_value: &String) -> Result<u32> {
+#[allow(dead_code)]
+pub fn get_tag_time(tag_value: &str) -> Result<u32> {
     let conn = connect_to_database()?;
 
     let mut stmt = conn.prepare("SELECT sum(strftime('%s', time) - strftime('%s', '00:00:00')) FROM tags WHERE value = :tag_value")?;
@@ -126,9 +125,13 @@ pub fn save_session(
 // TODO: reconsider typing
 #[derive(Debug)]
 pub struct TimeGained {
+    #[allow(dead_code)]
     id: i32,
+    #[allow(dead_code)]
     total_time: i32,
+    #[allow(dead_code)]
     durations_count: i32,
+    #[allow(dead_code)]
     durations_avg: String,
 }
 
@@ -175,7 +178,7 @@ impl fmt::Display for LifetimeOverview {
     }
 }
 
-pub fn get_lifetime_overview(session_tag: &String) -> Result<Vec<LifetimeOverview>> {
+pub fn get_lifetime_overview(session_tag: &str) -> Result<Vec<LifetimeOverview>> {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
     let database = working_directory + "/" + &DATABASE_NAME.to_string();
@@ -206,7 +209,7 @@ struct Tag {
     duration: String,
 }
 
-pub fn get_tags_pane(session_tag: &String) -> Result<String> {
+pub fn get_tags_pane(session_tag: &str) -> Result<String> {
     let conn = connect_to_database()?;
 
     let mut stmt =
@@ -230,7 +233,7 @@ pub struct TotalTimeAsSeconds {
     pub total_time: i32,
 }
 
-pub fn get_total_time_as_seconds(session_tag: &String) -> Result<Vec<TotalTimeAsSeconds>> {
+pub fn get_total_time_as_seconds(session_tag: &str) -> Result<Vec<TotalTimeAsSeconds>> {
     let working_directory =
         home_dir().unwrap().as_path().display().to_string() + "/.productivity-timer";
     let database = working_directory + "/" + &DATABASE_NAME.to_string();
@@ -255,21 +258,24 @@ pub fn get_total_time_as_seconds(session_tag: &String) -> Result<Vec<TotalTimeAs
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct DriveFile {
+    #[allow(dead_code)]
     kind: String,
     id: String,
+    #[allow(dead_code)]
     name: String,
-    // TODO: not picking up?
-    #[allow(non_camel_case_types)]
-    mimeType: String,
+    #[allow(dead_code)]
+    mime_type: String,
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct FilesResponse {
+    #[allow(dead_code)]
     kind: String,
-    // TODO: not picking up?
-    #[allow(non_camel_case_types)]
-    incompleteSearch: bool,
+    #[allow(dead_code)]
+    incomplete_search: bool,
     files: Vec<DriveFile>,
 }
 

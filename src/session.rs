@@ -74,7 +74,7 @@ impl Session {
     }
 
     pub fn update_time_gained(&mut self) {
-        if self.durations.len() != 0 {
+        if !self.durations.is_empty() {
             self.analytics
                 .update_time_gained(&self.durations, &self.additions, &self.subtractions);
         }
@@ -82,15 +82,12 @@ impl Session {
 
     pub fn save_session(self) {
         // This includes additions and subtractions via analytics
-        let formatted_time_gained = match self.analytics.time_gained {
-            Some(v) => format_instant_to_hhmmss(v),
-            None => "00:00:00".to_string(),
-        };
+        let formatted_time_gained = self.analytics.time_gained
+            .map(format_instant_to_hhmmss)
+            .unwrap_or_else(|| "00:00:00".into());
 
-        let duration_avg = match self.analytics.duration_avg {
-            Some(v) => v.to_string(),
-            None => 0.to_string(),
-        };
+        let duration_avg = self.analytics.duration_avg
+            .unwrap_or_else(|| "0".into());
 
         database::save_session(
             formatted_time_gained,
@@ -105,12 +102,16 @@ impl Session {
         // makes sense to take tags for, them, too. Expand this to cover them, which will require
         // supporting tags for adds/subs
         for duration in self.durations {
-            database::save_tag(
-                self.id,
-                duration.tag.unwrap(),
-                format_instant_to_hhmmss(duration.time_gained.unwrap()),
-            )
-            .expect("Error saving tag");
+            if let (Some(tag), Some(time_gained)) = (duration.tag, duration.time_gained) {
+                database::save_tag(
+                    self.id,
+                    tag,
+                    format_instant_to_hhmmss(time_gained),
+                )
+                    .expect("Error saving tag")
+            } else {
+                panic!("Expected 'tag' and 'time_gained' to be defined")
+            }
         }
     }
 
@@ -119,15 +120,19 @@ impl Session {
             .durations
             .iter()
             .map(|duration| {
-                if duration.tag.as_ref().unwrap().to_string() == tag {
-                    match duration.time_gained {
-                        Some(time_gained) => time_gained,
-                        None => Instant::now()
-                            .checked_duration_since(duration.begin)
-                            .unwrap(),
+                if let Some(d_tag) = &duration.tag {
+                    if *d_tag == tag {
+                        match duration.time_gained {
+                            Some(time_gained) => time_gained,
+                            None => Instant::now()
+                                .checked_duration_since(duration.begin)
+                                .unwrap(),
+                        }
+                    } else {
+                        Duration::new(0, 0)
                     }
                 } else {
-                    Duration::new(0, 0)
+                    panic!("Expected 'tag' to be defined")
                 }
             })
             .sum();

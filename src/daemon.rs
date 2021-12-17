@@ -209,13 +209,13 @@ fn reset_tag() -> Result<(), Error> {
 
 fn get_misc() -> Result<String, Error> {
     let misc_filepath = get_filepath("misc")?;
-    Ok(read_to_string(&misc_filepath)?)
+    read_to_string(&misc_filepath)
 }
 
 fn get_tag() -> Result<Option<String>, Error> {
     let tag_filepath = get_filepath("tag")?;
     let tag = read_to_string(&tag_filepath).unwrap();
-    if tag != "" {
+    if !tag.is_empty() {
         Ok(Some(tag))
     } else {
         Ok(None)
@@ -312,7 +312,7 @@ pub fn trigger_time(tag: Option<String>) -> Result<(), Error> {
 
 pub fn get_time_gained() -> Result<String, Error> {
     let filepath = get_filepath("time-gained")?;
-    Ok(read_to_string(filepath)?)
+    read_to_string(filepath)
 }
 
 fn set_time_gained(time_gained: String) -> Result<(), Error> {

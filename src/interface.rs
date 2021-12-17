@@ -91,10 +91,10 @@ fn draw_tags<'a>(tags: String) -> Paragraph<'a> {
         )
 }
 
-fn draw_barchart<'a>(data: &'a Vec<(&'a str, u64)>) -> BarChart<'a> {
+fn draw_barchart<'a>(data: &'a [(&'a str, u64)]) -> BarChart<'a> {
     BarChart::default()
         .block(Block::default().title("Durations").borders(Borders::ALL))
-        .data(&data)
+        .data(data)
         .bar_width(9)
         .bar_style(Style::default().fg(Color::LightCyan))
         .value_style(Style::default().fg(Color::Black).bg(Color::LightCyan))

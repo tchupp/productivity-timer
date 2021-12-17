@@ -96,9 +96,11 @@ fn main() {
     if completing_session {
         let tag = matches.value_of("complete").unwrap().to_string();
         daemon::trigger_session_completion(tag).unwrap();
-        let times = database::get_times();
-        for time in times {
-            println!("gained time: {:?}", time);
+
+        if let Ok(times) = database::get_times() {
+            for time in times {
+                println!("gained time: {:?}", time);
+            }
         }
     }
 

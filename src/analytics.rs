@@ -23,9 +23,9 @@ impl Analytics {
 
     pub fn update_time_gained(
         &mut self,
-        durations: &Vec<PTDuration>,
-        additions: &Vec<PTDuration>,
-        subtractions: &Vec<PTDuration>,
+        durations: &[PTDuration],
+        additions: &[PTDuration],
+        subtractions: &[PTDuration],
     ) {
         let mut durations_time_gained: Vec<Duration> = durations
             .iter()
@@ -71,10 +71,7 @@ impl Analytics {
     }
 
     pub fn update_duration_count(&mut self) {
-        let duration_count = match self.duration_count {
-            Some(v) => v,
-            None => 0,
-        };
+        let duration_count = self.duration_count.unwrap_or(0);
 
         self.duration_count = Some(duration_count + 1);
     }
